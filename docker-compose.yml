@@ -1,0 +1,128 @@
+version: '3.8'
+
+services:
+  # -------------------------------------------------------------
+  # Fineract Core Banking Database
+  # -------------------------------------------------------------
+  fineract-db:
+    image: postgres:15-alpine
+    container_name: fineract-db
+    environment:
+      POSTGRES_USER: fineract
+      POSTGRES_PASSWORD: fineract
+      POSTGRES_DB: fineract_tenants
+    ports:
+      - "5433:5432"
+    volumes:
+      - fineract_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fineract -d fineract_tenants"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - fintech-network
+
+  # -------------------------------------------------------------
+  # Apache Fineract (Customized Build with GL External Reference)
+  # -------------------------------------------------------------
+  fineract:
+    build:
+      context: ./fineract-customization
+      dockerfile: Dockerfile
+    container_name: fineract-core
+    environment:
+      FINERACT_DEFAULT_TENANTDB_HOSTNAME: fineract-db
+      FINERACT_DEFAULT_TENANTDB_PORT: "5432"
+      FINERACT_DEFAULT_TENANTDB_UID: fineract
+      FINERACT_DEFAULT_TENANTDB_PWD: fineract
+      FINERACT_DEFAULT_TENANTDB_CONN_PARAMS: ""
+      FINERACT_DEFAULT_TENANTDB_NAME: fineract_default
+      JAVA_TOOL_OPTIONS: "-Xms512m -Xmx1024m"
+    ports:
+      - "8443:8443"
+    depends_on:
+      fineract-db:
+        condition: service_healthy
+    networks:
+      - fintech-network
+
+  # -------------------------------------------------------------
+  # Integration Service & Mock ERP Shared Database
+  # -------------------------------------------------------------
+  app-db:
+    image: postgres:15-alpine
+    container_name: app-db
+    environment:
+      POSTGRES_USER: fintech
+      POSTGRES_PASSWORD: fintech_secret
+      POSTGRES_DB: integration_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - app_db_data:/var/lib/postgresql/data
+      - ./scripts/init-app-db.sql:/docker-entrypoint-initdb.d/init-app-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fintech -d integration_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - fintech-network
+
+  # -------------------------------------------------------------
+  # Mock ERP (Python / FastAPI)
+  # -------------------------------------------------------------
+  mock-erp:
+    build:
+      context: ./mock-erp
+      dockerfile: Dockerfile
+    container_name: mock-erp
+    environment:
+      DATABASE_URL: postgresql://fintech:fintech_secret@app-db:5432/mock_erp_db
+      PORT: "8001"
+      LOG_LEVEL: INFO
+    ports:
+      - "8001:8001"
+    depends_on:
+      app-db:
+        condition: service_healthy
+    networks:
+      - fintech-network
+
+  # -------------------------------------------------------------
+  # Integration Service (Python / FastAPI)
+  # -------------------------------------------------------------
+  integration-service:
+    build:
+      context: ./integration-service
+      dockerfile: Dockerfile
+    container_name: integration-service
+    environment:
+      DATABASE_URL: postgresql://fintech:fintech_secret@app-db:5432/integration_db
+      FINERACT_BASE_URL: https://fineract:8443/fineract-provider/api/v1
+      FINERACT_TENANT_ID: default
+      FINERACT_AUTH_USER: mifos
+      FINERACT_AUTH_PASSWORD: password
+      FINERACT_INSECURE_SSL: "true"
+      MOCK_ERP_URL: http://mock-erp:8001
+      PORT: "8000"
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    depends_on:
+      app-db:
+        condition: service_healthy
+      mock-erp:
+        condition: service_started
+    networks:
+      - fintech-network
+
+volumes:
+  fineract_db_data:
+  app_db_data:
+
+networks:
+  fintech-network:
+    driver: bridge
+

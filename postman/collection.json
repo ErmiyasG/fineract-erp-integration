@@ -1,0 +1,50 @@
+{
+  "info": {
+    "_postman_id": "71399f6b-028a-4c22-bca6-538d58548a31",
+    "name": "Fintech Assessment API Collection",
+    "description": "Postman collection covering Integration Service, Mock ERP, and Fineract operations",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "System Health",
+      "item": [
+        {
+          "name": "Integration Service Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{integration_url}}/health",
+              "host": ["{{integration_url}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Mock ERP Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{mock_erp_url}}/health",
+              "host": ["{{mock_erp_url}}"],
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "integration_url",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "mock_erp_url",
+      "value": "http://localhost:8001"
+    }
+  ]
+}
+
