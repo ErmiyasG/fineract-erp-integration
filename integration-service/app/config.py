@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "postgresql://fintech:fintech_secret@app-db:5432/integration_db"
+    DATABASE_URL: str = "postgresql+psycopg2://fintech:fintech_secret@app-db:5432/integration_db"
     FINERACT_BASE_URL: str = "https://fineract:8443/fineract-provider/api/v1"
     FINERACT_TENANT_ID: str = "default"
     FINERACT_AUTH_USER: str = "mifos"
