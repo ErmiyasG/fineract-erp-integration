@@ -1,8 +1,10 @@
 """
 Database Engine and Session Management
 """
+from collections.abc import Generator
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import settings
 from app.models.db import Base
@@ -22,7 +24,7 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
 
 
-def get_db():
+def get_db() -> Generator[Session, None, None]:
     """FastAPI dependency for database sessions"""
     db = SessionLocal()
     try:

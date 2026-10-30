@@ -58,7 +58,7 @@ def demo_direct_fineract_sync():
         except Exception as e:
             print(f"    [Notice] Live Fineract not running locally yet ({e}). Demonstrating contract via Integration Service mock/API...")
             demo_integration_service_sync()
-            return
+            return 
 
         # -------------------------------------------------------------
         # Behavior 2: Same Reference, Identical Payload -> Return Existing (No Duplicate)
@@ -129,3 +129,4 @@ def demo_integration_service_sync():
 
 if __name__ == "__main__":
     demo_direct_fineract_sync()
+

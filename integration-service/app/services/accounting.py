@@ -66,20 +66,20 @@ def derive_journal_entries_from_breakdown(
       CR 1200 Loan Receivable (Principal portion)
       CR 4000 Interest Income (Interest portion)
     """
-    debits = []
-    credits = []
+    debits: list[dict[str, Any]] = []
+    credits: list[dict[str, Any]] = []
 
     op = operation_type.upper()
     if op == "DISBURSEMENT":
-        debits.append({"account_code": receivable_account_code, "amount": total_amount})
-        credits.append({"account_code": bank_account_code, "amount": total_amount})
+        debits.append({"account_code": receivable_account_code, "amount": float(total_amount)})
+        credits.append({"account_code": bank_account_code, "amount": float(total_amount)})
     elif op == "REPAYMENT":
         principal = float(breakdown.get("principal", 0.0))
         interest = float(breakdown.get("interest", 0.0))
         fee = float(breakdown.get("fee", 0.0))
         penalty = float(breakdown.get("penalty", 0.0))
 
-        debits.append({"account_code": bank_account_code, "amount": total_amount})
+        debits.append({"account_code": bank_account_code, "amount": float(total_amount)})
 
         if principal > 0:
             credits.append({"account_code": receivable_account_code, "amount": principal})
@@ -88,17 +88,25 @@ def derive_journal_entries_from_breakdown(
 
         # Overpayment or unallocated amount
         allocated = principal + interest + fee + penalty
-        unallocated = total_amount - allocated
+        unallocated = float(total_amount) - allocated
         if unallocated > 0:
             credits.append({"account_code": bank_account_code, "amount": unallocated})
     else:
         raise ValueError(f"Unknown operation type: {operation_type}")
 
-    total_debits = sum(d["amount"] for d in debits)
-    total_credits = sum(c["amount"] for c in credits)
+    total_debits = sum(float(d["amount"]) for d in debits)
+    total_credits = sum(float(c["amount"]) for c in credits)
 
     if round(total_debits, 4) != round(total_credits, 4):
         raise ValueError(f"Unbalanced journal entry generated: debits={total_debits}, credits={total_credits}")
+
+    lines = [
+        {"account_code": d["account_code"], "entry_type": "DEBIT", "amount": d["amount"]}
+        for d in debits
+    ] + [
+        {"account_code": c["account_code"], "entry_type": "CREDIT", "amount": c["amount"]}
+        for c in credits
+    ]
 
     return {
         "external_reference": external_reference,
@@ -106,4 +114,5 @@ def derive_journal_entries_from_breakdown(
         "total_amount": total_amount,
         "debits": debits,
         "credits": credits,
+        "lines": lines,
     }

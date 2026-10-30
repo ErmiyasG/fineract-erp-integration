@@ -34,7 +34,7 @@ class FineractClient:
         tenant_id: str | None = None,
         user: str | None = None,
         password: str | None = None,
-        timeout: float = 10.0,
+        timeout: float = 15.0,
     ):
         self.base_url = (base_url or settings.FINERACT_BASE_URL).rstrip("/")
         self.tenant_id = tenant_id or settings.FINERACT_TENANT_ID
@@ -54,6 +54,49 @@ class FineractClient:
             headers["X-Correlation-ID"] = correlation_id
         return headers
 
+    async def _post(self, path: str, payload: dict[str, Any], correlation_id: str | None = None) -> dict[str, Any]:
+        url = f"{self.base_url}/{path.lstrip('/')}"
+        try:
+            async with httpx.AsyncClient(verify=not settings.FINERACT_INSECURE_SSL, timeout=self.timeout) as client:
+                res = await client.post(url, json=payload, headers=self._get_headers(correlation_id))
+                if res.status_code in (200, 201):
+                    return res.json()
+                elif res.status_code == 409:
+                    raise FineractConflictException(
+                        f"Fineract 409 Conflict at {path}: {res.text}",
+                        status_code=409,
+                        details={"response": res.text, "path": path},
+                    )
+                else:
+                    raise FineractClientException(
+                        f"Fineract returned HTTP {res.status_code} at {path}: {res.text}",
+                        status_code=res.status_code,
+                        details={"response": res.text, "path": path},
+                    )
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
+            raise FineractConnectionException(f"Fineract connection error at {path}: {exc}") from exc
+
+    async def _get(self, path: str, correlation_id: str | None = None) -> dict[str, Any] | None:
+        url = f"{self.base_url}/{path.lstrip('/')}"
+        try:
+            async with httpx.AsyncClient(verify=not settings.FINERACT_INSECURE_SSL, timeout=self.timeout) as client:
+                res = await client.get(url, headers=self._get_headers(correlation_id))
+                if res.status_code == 200:
+                    return res.json()
+                elif res.status_code == 404:
+                    return None
+                else:
+                    raise FineractClientException(
+                        f"Fineract returned HTTP {res.status_code} at {path}: {res.text}",
+                        status_code=res.status_code,
+                        details={"response": res.text, "path": path},
+                    )
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
+            raise FineractConnectionException(f"Fineract connection error at {path}: {exc}") from exc
+
+    # -------------------------------------------------------------------------
+    # GL Account Methods
+    # -------------------------------------------------------------------------
     async def create_gl_account(
         self,
         name: str,
@@ -65,13 +108,6 @@ class FineractClient:
         manual_entries_allowed: bool = True,
         correlation_id: str | None = None,
     ) -> dict[str, Any]:
-        """
-        Calls Fineract POST /api/v1/glaccounts.
-        Enforces idempotency and conflict rules on Fineract side:
-        - 200: Created or existing account returned.
-        - 409: Conflict (existing external_reference with different attributes).
-        """
-        url = f"{self.base_url}/glaccounts"
         payload = {
             "name": name,
             "glCode": gl_code,
@@ -82,48 +118,154 @@ class FineractClient:
             "external_reference": external_reference,
             "externalReference": external_reference,
         }
-
-        try:
-            async with httpx.AsyncClient(verify=not settings.FINERACT_INSECURE_SSL, timeout=self.timeout) as client:
-                response = await client.post(url, json=payload, headers=self._get_headers(correlation_id))
-
-                if response.status_code == 200:
-                    return response.json()
-                elif response.status_code == 409:
-                    raise FineractConflictException(
-                        f"Conflict in Fineract for GL account with external reference {external_reference}: {response.text}",
-                        status_code=409,
-                        details={"response": response.text, "external_reference": external_reference},
-                    )
-                elif response.status_code in (401, 403):
-                    raise FineractClientException(
-                        f"Authentication or permission failed in Fineract: {response.status_code}",
-                        status_code=response.status_code,
-                        details={"response": response.text},
-                    )
-                else:
-                    raise FineractClientException(
-                        f"Fineract returned HTTP {response.status_code}: {response.text}",
-                        status_code=response.status_code,
-                        details={"response": response.text},
-                    )
-        except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
-            raise FineractConnectionException(
-                f"Fineract connection failed: {exc}",
-                details={"error": str(exc), "url": url},
-            ) from exc
+        return await self._post("glaccounts", payload, correlation_id)
 
     async def get_gl_account_by_id(self, account_id: int, correlation_id: str | None = None) -> dict[str, Any] | None:
-        """Fetch GL Account by internal ID"""
-        url = f"{self.base_url}/glaccounts/{account_id}"
-        try:
-            async with httpx.AsyncClient(verify=not settings.FINERACT_INSECURE_SSL, timeout=self.timeout) as client:
-                res = await client.get(url, headers=self._get_headers(correlation_id))
-                if res.status_code == 200:
-                    return res.json()
-                return None
-        except Exception as exc:
-            raise FineractConnectionException(f"Failed to fetch GL account: {exc}") from exc
+        return await self._get(f"glaccounts/{account_id}", correlation_id)
+
+    # -------------------------------------------------------------------------
+    # Client Methods (Part C)
+    # -------------------------------------------------------------------------
+    async def create_client(
+        self,
+        client_uid: str,
+        first_name: str,
+        last_name: str,
+        office_id: int = 1,
+        activation_date: str = "2026-01-01",
+        correlation_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Creates and activates a client in Fineract with externalId = client_uid."""
+        payload = {
+            "officeId": office_id,
+            "firstname": first_name,
+            "lastname": last_name,
+            "externalId": client_uid,
+            "active": True,
+            "activationDate": activation_date,
+            "dateFormat": "yyyy-MM-dd",
+            "locale": "en",
+        }
+        return await self._post("clients", payload, correlation_id)
+
+    async def get_client_by_external_id(self, client_uid: str, correlation_id: str | None = None) -> dict[str, Any] | None:
+        """Looks up client by externalId (client_uid) in Fineract."""
+        # Fineract supports /clients?externalId={externalId} or /clients/external-id/{externalId}
+        data = await self._get(f"clients?externalId={client_uid}", correlation_id)
+        if data and isinstance(data, dict):
+            page_items = data.get("pageItems", [])
+            if page_items:
+                return page_items[0]
+        return None
+
+    async def get_client_by_id(self, client_id: int, correlation_id: str | None = None) -> dict[str, Any] | None:
+        return await self._get(f"clients/{client_id}", correlation_id)
+
+    # -------------------------------------------------------------------------
+    # Loan Methods (Part D & E)
+    # -------------------------------------------------------------------------
+    async def create_loan_application(
+        self,
+        client_id: int,
+        product_id: int,
+        loan_reference: str,
+        principal: float,
+        term_months: int = 12,
+        interest_rate: float = 18.0,
+        disbursement_date: str = "2026-01-01",
+        correlation_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Submits loan application with externalId = loan_reference."""
+        payload = {
+            "clientId": client_id,
+            "productId": product_id,
+            "principal": principal,
+            "loanTermFrequency": term_months,
+            "loanTermFrequencyType": 2,  # Months
+            "numberOfRepayments": term_months,
+            "repaymentEvery": 1,
+            "repaymentFrequencyType": 2,  # Months
+            "interestRatePerPeriod": round(interest_rate / 12.0, 4),
+            "interestRateFrequencyType": 2,  # Month
+            "amortizationType": 1,  # Equal installments
+            "interestType": 0,  # Declining balance
+            "interestCalculationPeriodType": 1,
+            "transactionProcessingStrategyCode": "mifos-standard-strategy",
+            "expectedDisbursementDate": disbursement_date,
+            "submittedOnDate": disbursement_date,
+            "externalId": loan_reference,
+            "dateFormat": "yyyy-MM-dd",
+            "locale": "en",
+        }
+        return await self._post("loans", payload, correlation_id)
+
+    async def approve_loan(
+        self,
+        loan_id: int,
+        approval_date: str = "2026-01-01",
+        correlation_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Approves a loan in Fineract."""
+        payload = {
+            "approvedOnDate": approval_date,
+            "dateFormat": "yyyy-MM-dd",
+            "locale": "en",
+        }
+        return await self._post(f"loans/{loan_id}?command=approve", payload, correlation_id)
+
+    async def disburse_loan(
+        self,
+        loan_id: int,
+        amount: float,
+        disbursement_date: str = "2026-01-01",
+        external_id: str | None = None,
+        correlation_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Disburses a loan with externalId."""
+        payload = {
+            "actualDisbursementDate": disbursement_date,
+            "transactionAmount": amount,
+            "externalId": external_id,
+            "dateFormat": "yyyy-MM-dd",
+            "locale": "en",
+        }
+        return await self._post(f"loans/{loan_id}?command=disburse", payload, correlation_id)
+
+    async def repay_loan(
+        self,
+        loan_id: int,
+        amount: float,
+        transaction_date: str = "2026-02-01",
+        external_id: str | None = None,
+        correlation_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Applies a repayment to a loan in Fineract."""
+        payload = {
+            "transactionDate": transaction_date,
+            "transactionAmount": amount,
+            "externalId": external_id,
+            "dateFormat": "yyyy-MM-dd",
+            "locale": "en",
+        }
+        return await self._post(f"loans/{loan_id}?command=repayment", payload, correlation_id)
+
+    async def get_loan_by_id(self, loan_id: int, correlation_id: str | None = None) -> dict[str, Any] | None:
+        """Fetches loan details including current status and outstanding balance."""
+        return await self._get(f"loans/{loan_id}?associations=all", correlation_id)
+
+    async def get_loan_by_external_id(self, loan_reference: str, correlation_id: str | None = None) -> dict[str, Any] | None:
+        """Looks up loan by externalId (loan_reference) in Fineract."""
+        data = await self._get(f"loans/external-id/{loan_reference}", correlation_id)
+        return data
+
+    async def get_loan_transaction(
+        self,
+        loan_id: int,
+        transaction_id: int,
+        correlation_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Fetches loan transaction breakdown (principal, interest, fees, penalties)."""
+        return await self._get(f"loans/{loan_id}/transactions/{transaction_id}", correlation_id)
 
 
 fineract_client = FineractClient()

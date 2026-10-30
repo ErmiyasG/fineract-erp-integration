@@ -33,7 +33,18 @@ This document records the architectural rationale, trade-offs, and failure recov
   * If the transaction exists $\to$ transition state to `FINERACT_DONE` and proceed to ERP posting.
   * If the transaction does not exist $\to$ safe to retry or transition to `FAILED`.
 
-### 1.5 What Was Deliberately Not Built & Known Weaknesses
+### 1.5 Accounting Rules: Cash-Based vs. Accrual
+* **Options Evaluated:**
+  1. *Accrual Accounting (`accountingRule: 3`):* Recognizes interest income and fee income periodically before cash is collected.
+  2. *Cash-Based Accounting (`accountingRule: 2`):* Recognizes interest and other income only when actual cash repayments are received.
+* **Decision:** Cash-Based Accounting.
+* **Rationale:** In SME asset financing with discrete monthly installments, cash-based accounting guarantees that income is strictly recognized when cash enters the bank account upon repayment. This eliminates prematurely recognizing interest receivables from potentially delinquent borrowers, directly mirrors the ERP cash journal entries (`DR 1100 Bank / CR 1200 Loan Receivable / CR 4000 Interest Income`), and ensures deterministic two-way reconciliation against bank accounts and general ledgers.
+
+### 1.6 Identity Architecture: Strictly Zero Leaked Fineract Numeric IDs
+* **Decision:** Partner contracts strictly use business identifiers (`client_uid`, `loan_reference`, and `external_reference`).
+* **Rationale:** Exposing database primary keys (`clientId: 12`, `loanId: 45`) couples external partners to the internal storage engine, breaches multi-tenant isolation, and leaks data volume information. Local mapping tables (`client_mappings`, `loan_mappings`) map business keys to Fineract's `externalId` and internal IDs transparently.
+
+### 1.7 What Was Deliberately Not Built & Known Weaknesses
 * **Not Built:** Distributed two-phase commit (XA transactions), multi-currency FX conversion, multi-tranche loan schedules.
 * **Known Weakness:** If Mock ERP is partitioned for hours while Fineract succeeds, transactions remain in `NEEDS_RECONCILIATION` until the ERP recovery sweeper runs or manual reconciliation is triggered.
 

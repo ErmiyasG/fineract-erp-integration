@@ -4,9 +4,11 @@ SQLAlchemy Database Models for Integration Service
 from datetime import UTC, datetime
 
 from sqlalchemy import JSON, Column, DateTime, Float, Integer, String, Text, UniqueConstraint
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import DeclarativeBase
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    pass
 
 
 class AccountSyncMapping(Base):
