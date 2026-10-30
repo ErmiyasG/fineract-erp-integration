@@ -48,6 +48,23 @@ This document records the architectural rationale, trade-offs, and failure recov
 * **Not Built:** Distributed two-phase commit (XA transactions), multi-currency FX conversion, multi-tranche loan schedules.
 * **Known Weakness:** If Mock ERP is partitioned for hours while Fineract succeeds, transactions remain in `NEEDS_RECONCILIATION` until the ERP recovery sweeper runs or manual reconciliation is triggered.
 
+### 1.8 Source of Truth for Financial Breakdown: Fineract Core vs. Integration Service
+* **Options Evaluated:**
+  1. *Calculate principal/interest split in Integration Service:* Integration service computes amortization schedules using standard loan formulas.
+  2. *Delegate calculation to ERP:* Send total payment to ERP and let ERP allocate between principal and interest.
+  3. *Fetch transaction breakdown directly from Fineract core:* Query `GET /loans/{loanId}/transactions/{transactionId}` to retrieve exact portions calculated by Fineract.
+* **Decision:** Fetch transaction breakdown directly from Fineract core.
+* **Rationale:** Calculating financial amortization outside the core banking platform leads to rounding differences, schedule desynchronization (e.g. 365 vs 360 day counts, leap years, grace periods), and disputes. Fineract is the single source of truth for the loan schedule. Deriving double-entry journal entries directly from Fineract's breakdown ensures the General Ledger in ERP matches the core loan engine down to the cent.
+
+### 1.9 Overpayments & Reversals: Immutable Double-Entry Accounting
+* **Overpayments:**
+  * When repayment exceeds outstanding obligations, crediting revenue or over-reducing loan receivable violates accounting standards.
+  * The excess amount is allocated to Account `2100` (`Customer Overpayment Liability`). This accurately records the institution's debt to the borrower while maintaining debits = credits.
+* **Reversals:**
+  * In financial ledgers, deleting or directly modifying previously posted journal entries destroys auditability.
+  * Reversals are executed as compensating entries (`DISBURSEMENT_REVERSAL`, `REPAYMENT_REVERSAL`) that post exact inverse debit and credit entries.
+  * Both the erroneous transaction and its reversal remain permanently visible in the audit trail.
+
 ---
 
 ## 2. Production Incident Investigation Walkthrough

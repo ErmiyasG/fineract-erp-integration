@@ -8,7 +8,6 @@ Seeds all four outcomes:
 3. MISSING_IN_FINERACT
 4. AMOUNT_MISMATCH
 """
-import sys
 
 def main() -> None:
     print("==================================================================")

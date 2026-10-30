@@ -8,7 +8,6 @@ Verifies:
 - ERP journal entries: 1
 - Integration transactions: 1
 """
-import sys
 
 def main() -> None:
     print("==================================================================")

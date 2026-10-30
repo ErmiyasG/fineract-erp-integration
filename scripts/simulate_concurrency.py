@@ -4,7 +4,6 @@ SIM-I2 & SIM-I3: Concurrency Simulations
 - I2: 10 parallel disbursements for the same loan (same ref & different refs)
 - I3: Concurrent repayments on the same loan with different refs
 """
-import sys
 
 def main() -> None:
     print("==================================================================")

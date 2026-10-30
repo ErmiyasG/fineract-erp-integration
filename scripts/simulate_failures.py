@@ -7,7 +7,6 @@ SIM-J: Failure Scenarios & Fault Injection Simulation
 4. ERP timeout after entry was written
 5. Crash between Fineract success and ERP call
 """
-import sys
 
 def main() -> None:
     print("==================================================================")

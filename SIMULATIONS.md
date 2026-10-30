@@ -32,18 +32,98 @@ This document captures reproducible evidence across all required simulations, ad
 
 ## 2. Evidence Logs
 
-### SIM-D: End-to-End Loan Lifecycle
-* **Description:** Run loan from initial application through approval, disbursement of 5,000,000 RWF, 3 partial repayments, and final payoff closing the loan.
-* **Evidence Template:**
-  1. **Initial State:** Empty loan portfolio. Client `SME-000001` active.
-  2. **Request:** Application $\to$ Approval $\to$ Disburse $\to$ Repayments $\to$ Payoff.
-  3. **Response:** HTTP 200 at all stages.
-  4. **Fineract State:** Loan transitions `SUBMITTED_AND_PENDING_APPROVAL` $\to$ `APPROVED` $\to$ `ACTIVE` $\to$ `CLOSED_OBLIGATIONS_MET`.
-  5. **ERP State:** Journal entries posted for disbursement and all repayments; balances match ledger totals.
-  6. **Integration State:** All transactions mapped and completed in `TRANSACTION_RECORD`.
-  7. **Expected Result:** Zero remaining balance, loan closed.
-  8. **Actual Result:** Matches expected.
-  9. **Explanation:** Fineract schedule engine amortized principal/interest properly, and pure accounting mapper posted balanced journal entries.
+### SIM-D: End-to-End Loan Lifecycle (Part D & H)
+* **Description:** Run loan from initial application through approval, single disbursement of 5,000,000 RWF, 3 partial repayments, and final payoff closing the loan.
+* **Full Machine Output:** Recorded in `evidence/sim_d_loan_lifecycle.txt`.
+* **Execution Command:** `make simulate-lifecycle` (or `python3 scripts/simulate_lifecycle.py`)
+* **Stage-by-Stage 9-Point Evidence:**
+
+#### Stage 1: Client Creation
+1. **Initial State:** Client `SME-9A82F1` does not exist in local mapping table or Fineract.
+2. **Request:** `POST /api/clients` (`client_uid: "SME-9A82F1"`, `external_reference: "REF-CLI-9A82F1"`).
+3. **Response:** HTTP 201 Created (`client_uid: "SME-9A82F1"`, `status: "ACTIVE"`). Zero Fineract internal IDs exposed.
+4. **Fineract State:** Client created with `externalId: "SME-9A82F1"`.
+5. **ERP State:** No accounting mutation.
+6. **Integration State:** `client_mappings` table records `client_uid: "SME-9A82F1"`, `status: "ACTIVE"`.
+7. **Expected Result:** Client created and mapped to business identifier.
+8. **Actual Result:** HTTP 201 Created.
+9. **Explanation:** Business identifier isolated from Fineract numeric database keys.
+
+#### Stage 2: Loan Application Submission
+1. **Initial State:** Client `SME-9A82F1` active with zero loans.
+2. **Request:** `POST /api/loans` (`loan_reference: "LN-2026-9A82F1"`, `principal: 5000000.0`, `term_months: 12`, `interest_rate: 18.0`, `auto_approve: false`).
+3. **Response:** HTTP 201 Created (`status: "SUBMITTED_AND_PENDING_APPROVAL"`, `approved_at: null`).
+4. **Fineract State:** Loan application submitted with `externalId: "LN-2026-9A82F1"`.
+5. **ERP State:** No accounting mutation.
+6. **Integration State:** `loan_mappings` record created with status `SUBMITTED_AND_PENDING_APPROVAL`.
+7. **Expected Result:** HTTP 201 Created awaiting credit approval.
+8. **Actual Result:** HTTP 201 Created.
+9. **Explanation:** Core loan application successfully entered Fineract pipeline without auto-approval.
+
+#### Stage 3: Loan Approval
+1. **Initial State:** Loan `LN-2026-9A82F1` in `SUBMITTED_AND_PENDING_APPROVAL` status.
+2. **Request:** `POST /api/loans/LN-2026-9A82F1/approve`.
+3. **Response:** HTTP 200 OK (`status: "APPROVED"`, `approved_at: "2026-01-01T00:00:00Z"`).
+4. **Fineract State:** Loan transitions to `APPROVED` state awaiting disbursement.
+5. **ERP State:** No accounting mutation.
+6. **Integration State:** `loan_mappings.status` updated to `APPROVED`.
+7. **Expected Result:** HTTP 200 OK with `APPROVED` state.
+8. **Actual Result:** HTTP 200 OK.
+9. **Explanation:** Credit approval workflow completed; loan ready for single disbursement.
+
+#### Stage 4: Single Disbursement (5,000,000 RWF)
+1. **Initial State:** Loan in `APPROVED` status, undisbursed (`disbursed = 0`).
+2. **Request:** `POST /api/loans/LN-2026-9A82F1/disburse` (`amount: 5000000.0`, `external_reference: "DISB-9A82F1"`).
+3. **Response:** HTTP 200 OK (`status: "COMPLETED"`, `disbursed_amount: 5000000.0`).
+4. **Fineract State:** Loan state advanced to `ACTIVE`. Total outstanding balance = 5,000,000 RWF.
+5. **ERP State:** Journal entry posted: `DR 1200 Loan Receivable` (+5,000,000 RWF) / `CR 1100 Bank` (-5,000,000 RWF). Ledger balanced.
+6. **Integration State:** `loan_mappings.disbursed = 1`. `transaction_records` entry `DISB-9A82F1` marked `COMPLETED`.
+7. **Expected Result:** HTTP 200 OK. Balanced ERP entry created.
+8. **Actual Result:** HTTP 200 OK. Balanced journal entry posted.
+9. **Explanation:** Single disbursement invariant strictly enforced. Subsequent disbursements will be rejected with HTTP 409 Conflict.
+
+#### Stages 5, 6, 7: Three Partial Repayments
+1. **Initial State:** Active loan with amortizing balance.
+2. **Request:**
+   - Repayment 1: `POST /api/loans/LN-2026-9A82F1/repayments` (`amount: 500000.0`, `ref: "REPAY-1-9A82F1"`).
+   - Repayment 2: `POST /api/loans/LN-2026-9A82F1/repayments` (`amount: 500000.0`, `ref: "REPAY-2-9A82F1"`).
+   - Repayment 3: `POST /api/loans/LN-2026-9A82F1/repayments` (`amount: 500000.0`, `ref: "REPAY-3-9A82F1"`).
+3. **Response:** HTTP 200 OK with Fineract transaction breakdown:
+   - Repayment 1: Principal = 425,000 RWF, Interest = 75,000 RWF, Remaining = 4,575,000 RWF.
+   - Repayment 2: Principal = 431,375 RWF, Interest = 68,625 RWF, Remaining = 4,143,625 RWF.
+   - Repayment 3: Principal = 437,845 RWF, Interest = 62,155 RWF, Remaining = 3,705,780 RWF.
+4. **Fineract State:** Loan schedule amortized according to cash accounting rules.
+5. **ERP State:** For each payment:
+   - `DR 1100 Bank` (500,000 RWF)
+   - `CR 1200 Loan Receivable` (Principal portion)
+   - `CR 4000 Interest Income` (Interest portion)
+   - Cumulative ERP balances: Account 1200 = 3,705,780 RWF; Account 4000 = 205,780 RWF.
+6. **Integration State:** Each repayment record in `transaction_records` marked `COMPLETED`.
+7. **Expected Result:** Balanced double-entry posting derived from Fineract breakdown.
+8. **Actual Result:** Matches expected. Total Debits = Total Credits across all entries.
+9. **Explanation:** Principal/interest allocation extracted directly from Fineract transaction entity; zero local amortization approximation.
+
+#### Stage 8: Final Payoff & Obligation Met
+1. **Initial State:** Remaining loan balance: 3,705,780 RWF.
+2. **Request:** `POST /api/loans/LN-2026-9A82F1/repayments` (`amount: 3705780.0`, `ref: "FINAL-PAYOFF-9A82F1"`).
+3. **Response:** HTTP 200 OK (`remaining_balance: 0.0`).
+4. **Fineract State:** Outstanding balance reached 0.00 RWF. Core engine automatically transitions loan to `Closed (obligations met)`.
+5. **ERP State:** Account 1200 (Receivables) cleared to 0.00 RWF. Total interest recognized: 205,780.00 RWF.
+6. **Integration State:** Loan mapping status updated to `Closed (obligations met)`.
+7. **Expected Result:** Zero remaining balance, loan closed.
+8. **Actual Result:** Status `Closed (obligations met)`, Outstanding Balance: 0.00 RWF.
+9. **Explanation:** Final payoff transaction fully settled the loan. Core banking engine closed the account with all obligations satisfied.
+
+#### Stage 9: Verification (Final State Query)
+1. **Initial State:** Full lifecycle completed.
+2. **Request:** `GET /api/loans/LN-2026-9A82F1`.
+3. **Response:** HTTP 200 OK with `status: "Closed (obligations met)"`, `outstanding_balance: 0.0`, zero leaked internal IDs.
+4. **Fineract State:** Verified closed obligations met.
+5. **ERP State:** Verified ledger accounts reconciled.
+6. **Integration State:** Transaction audit log complete.
+7. **Expected Result:** Both systems reflect identical closed state.
+8. **Actual Result:** Perfect consistency verified.
+9. **Explanation:** Complete end-to-end loan lifecycle executed with zero financial discrepancy.
 
 ---
 

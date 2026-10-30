@@ -124,6 +124,37 @@ async def get_loan(
 
 
 @router.post(
+    "/{loan_reference}/approve",
+    response_model=LoanResponse,
+    responses={
+        404: {"model": ErrorResponse, "description": "Loan not found"},
+    },
+)
+async def approve_loan(
+    loan_reference: str,
+    db: Session = Depends(get_db),
+    x_correlation_id: str | None = Header(None),
+) -> LoanResponse:
+    """Approves a submitted loan application."""
+    correlation_id = x_correlation_id or str(uuid.uuid4())
+    try:
+        return await loan_service.approve_loan(db, loan_reference, correlation_id=correlation_id)
+    except LoanNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": {
+                    "code": "LOAN_NOT_FOUND",
+                    "message": str(exc),
+                    "details": {"loan_reference": loan_reference},
+                    "correlation_id": correlation_id,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                }
+            },
+        )
+
+
+@router.post(
     "/{loan_reference}/disburse",
     response_model=DisbursementResponse,
     status_code=status.HTTP_200_OK,

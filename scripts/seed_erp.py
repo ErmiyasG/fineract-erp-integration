@@ -7,6 +7,7 @@ Accounts:
 - 4000: Interest Income (Income)
 """
 import sys
+
 import httpx
 
 MOCK_ERP_URL = "http://localhost:8001"
@@ -48,7 +49,7 @@ def main() -> None:
             for acc in ACCOUNTS:
                 resp = client.post("/api/accounts", json=acc)
                 print(f"Account {acc['code']} ({acc['name']}): status {resp.status_code}")
-    except Exception as e:
+    except (httpx.HTTPError, ValueError) as e:
         print(f"Failed to connect to Mock ERP: {e}")
         sys.exit(1)
 

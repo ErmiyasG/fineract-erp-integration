@@ -171,6 +171,41 @@ class LoanLifecycleService:
             idempotency_service.mark_failed(db, "CREATE_LOAN", request.external_reference)
             raise
 
+    async def approve_loan(
+        self,
+        db: Session,
+        loan_reference: str,
+        approval_date: str = "2026-01-01",
+        correlation_id: str | None = None,
+    ) -> LoanResponse:
+        """Explicitly approves a loan submitted in Fineract."""
+        mapping = (
+            db.query(LoanMapping)
+            .filter(LoanMapping.loan_reference == loan_reference)
+            .first()
+        )
+        if not mapping:
+            raise LoanNotFoundError(f"Loan reference '{loan_reference}' not found.")
+
+        await self.fineract_client.approve_loan(
+            loan_id=int(mapping.fineract_loan_id),
+            approval_date=approval_date,
+            correlation_id=correlation_id,
+        )
+        mapping.status = "APPROVED"
+        mapping.updated_at = datetime.now(UTC)
+        db.commit()
+
+        return LoanResponse(
+            loan_reference=str(mapping.loan_reference),
+            client_uid=str(mapping.client_uid),
+            status=str(mapping.status),
+            principal=float(mapping.principal),
+            outstanding_balance=float(mapping.principal),
+            approved_at=datetime.now(UTC).isoformat(),
+            disbursed_at=None,
+        )
+
     async def get_loan_by_reference(
         self,
         db: Session,

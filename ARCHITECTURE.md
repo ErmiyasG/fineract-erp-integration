@@ -175,3 +175,72 @@ stateDiagram-v2
    * **Existing reference + Conflicting attributes:** Rejects with `HTTP 409 Conflict`.
 5. Fineract permissions model guards the endpoint (`CREATE_GLACCOUNT`).
 
+---
+
+## 6. Pure Accounting Mapping & Ledger Derivation (Part H)
+
+### 6.1 Pure Function Guarantee
+The mapping from core banking events to double-entry general ledger journal entries is implemented as a **pure function** (`derive_journal_entries_from_breakdown` in `app/services/accounting.py`):
+- **Deterministic:** The exact same input parameters always produce the exact same journal lines.
+- **Zero Side Effects:** Does not interact with databases, network sockets, file systems, or global state.
+- **Independently Unit-Testable:** Validated in `tests/test_accounting.py` without requiring mocks, stubs, or running servers.
+
+### 6.2 Ledger Mapping Rules
+
+| Event / Operation Type | Debit Accounts | Credit Accounts | Invariant Verified |
+| :--- | :--- | :--- | :--- |
+| **`DISBURSEMENT`** | `DR 1200` Loan Receivable (Principal) | `CR 1100` Bank Account (Disbursed Amount) | $\sum DR = \sum CR = \text{Amount}$ |
+| **`DISBURSEMENT_REVERSAL`** | `DR 1100` Bank Account | `CR 1200` Loan Receivable | Exact inversion of disbursement lines |
+| **`REPAYMENT`** (Standard) | `DR 1100` Bank Account (Total Cash Paid) | `CR 1200` Loan Receivable (Principal Portion)<br>`CR 4000` Interest Income (Interest Portion) | $\text{Cash} = \text{Principal} + \text{Interest}$ |
+| **`REPAYMENT`** (With Fees/Penalties) | `DR 1100` Bank Account | `CR 1200` Principal<br>`CR 4000` Interest<br>`CR 4100` Fee Income<br>`CR 4200` Penalty Income | Cash equals sum of all portions |
+| **`REPAYMENT`** (With Overpayment) | `DR 1100` Bank Account | `CR 1200` Principal<br>`CR 4000` Interest<br>`CR 2100` Customer Overpayment Liability | Unallocated cash recognized as liability |
+| **`REPAYMENT_REVERSAL`** | `DR 1200` Principal<br>`DR 4000` Interest | `CR 1100` Bank Account | Exact inversion preserving historical ledger |
+
+### 6.3 Breakdown Source: Single Source of Truth
+- **Assessment Question:** *Where does the principal/interest split come from? Does Fineract provide it, does the integration service calculate it, or does the ERP?*
+- **Architecture Answer:** **Fineract core banking engine is the authoritative single source of truth.**
+  1. The integration service never calculates amortization or interest splits locally, eliminating rounding discrepancies or schedule drift.
+  2. When a repayment is submitted via `POST /loans/{loanId}/transactions?command=repayment`, Fineract's schedule engine applies its configured allocation strategy (e.g., Penalties $\to$ Fees $\to$ Interest $\to$ Principal).
+  3. The integration service fetches the precise breakdown from Fineract via `GET /loans/{loanId}/transactions/{transactionId}`, extracting:
+     - `principalPortion`
+     - `interestPortion`
+     - `feeChargesPortion`
+     - `penaltyChargesPortion`
+     - `unrecognizedAmount`
+  4. The pure mapping function consumes this exact breakdown to construct the balanced ERP journal entry.
+
+### 6.4 Handling Overpayments
+When a borrower pays more than the total outstanding balance:
+1. Fineract allocates payments up to total outstanding obligations and flags the excess in transaction breakdown or loan overpayment summary.
+2. In the pure accounting function, if `total_amount > (principal + interest + fee + penalty)`, the excess is credited to Account `2100` (`Customer Overpayment Liability`).
+3. This ensures:
+   - Ledgers remain perfectly balanced ($\sum \text{Debits} = \sum \text{Credits}$).
+   - The institution correctly reflects a liability owed back to the customer rather than incorrectly inflating income or over-amortizing receivables.
+
+### 6.5 Handling Reversals
+When an erroneous disbursement or repayment is reversed in Fineract:
+1. Fineract marks the original transaction entity with `manuallyReversed: true`.
+2. To preserve an immutable accounting audit trail, previously posted ERP journal entries are **never deleted or modified**.
+3. Instead, the integration service invokes the pure accounting function with `DISBURSEMENT_REVERSAL` or `REPAYMENT_REVERSAL`.
+4. The function outputs compensating journal lines that mirror the original debits and credits in reverse, restoring the account balances to their correct state.
+
+---
+
+## 7. Loan Lifecycle & Invariant Protection (Part D)
+
+### 7.1 End-to-End Lifecycle Stages
+The integration service supports the full 6-phase loan lifecycle:
+1. **Client Creation:** Partner calls `POST /api/clients` with `client_uid` (e.g. `SME-000001`). Mapped to Fineract `externalId`.
+2. **Loan Application:** Partner calls `POST /api/loans` with `loan_reference` (e.g. `LN-2026-000001`), `principal=5,000,000 RWF`, `term_months=12`, `interest_rate=18.0`. Initial state: `SUBMITTED_AND_PENDING_APPROVAL`.
+3. **Loan Approval:** Partner or workflow calls `POST /api/loans/{loan_reference}/approve`. Loan transitions to `APPROVED`.
+4. **Loan Disbursement:** Partner calls `POST /api/loans/{loan_reference}/disburse`. Fineract disburses loan (`ACTIVE`), and ERP journal entry is posted (`DR 1200 / CR 1100`).
+5. **Partial Repayments:** Partner submits at least 3 partial repayments via `POST /api/loans/{loan_reference}/repayments`. Each transaction derives actual principal/interest from Fineract and posts balanced lines to ERP.
+6. **Final Payoff & Close:** Payoff transaction clears outstanding balance. Fineract automatically closes the loan with status `Closed (obligations met)`.
+
+### 7.2 Single-Disbursement Invariant Enforcement
+To guarantee a loan can never be disbursed more than once:
+1. **Integration Layer Check:** `LoanMapping.disbursed == 1` causes immediate rejection with `HTTP 409 Conflict`.
+2. **Database Unique Constraint:** Unique index on `transaction_records(loan_reference)` where `operation_type = 'DISBURSEMENT'`.
+3. **Core Banking Engine Validation:** Fineract rejects disbursement commands on loans that are no longer in `APPROVED` status.
+
+

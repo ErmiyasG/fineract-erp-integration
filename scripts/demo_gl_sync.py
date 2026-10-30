@@ -8,7 +8,7 @@ Demonstrates:
   Behavior 4: Endpoint protected by Fineract permission model (HTTP 401/403)
 """
 import uuid
-import sys
+
 import httpx
 
 FINERACT_BASE_URL = "https://localhost:8443/fineract-provider/api/v1"
@@ -55,7 +55,7 @@ def demo_direct_fineract_sync():
             print(f"    [Behavior 1 Response] HTTP {res1.status_code}: {res1.text}")
             account_id_1 = res1.json().get("resourceId")
             print(f"    Account Created successfully with ID: {account_id_1}")
-        except Exception as e:
+        except (httpx.HTTPError, ValueError) as e:
             print(f"    [Notice] Live Fineract not running locally yet ({e}). Demonstrating contract via Integration Service mock/API...")
             demo_integration_service_sync()
             return 
