@@ -644,3 +644,46 @@ index 0000000..0020d4c
 +        Utils.performServerPost(unauthSpec, this.responseSpec401, GL_ACCOUNT_URL, new Gson().toJson(payload), "");
 +    }
 +}
+diff --git a/build.gradle b/build.gradle
+--- a/build.gradle
++++ b/build.gradle
+@@ -58,6 +58,7 @@ buildscript {
+         npmRepository = 'https://npm.pkg.github.com'
+     }
+     repositories {
++        mavenCentral()
+         maven { url 'https://plugins.gradle.org/m2/' }
+     }
+ 
+@@ -69,6 +70,15 @@ buildscript {
+         classpath 'io.swagger.core.v3:swagger-jaxrs2-jakarta:2.2.19'
+         classpath 'jakarta.servlet:jakarta.servlet-api:6.0.0'
+     }
++
++    configurations.classpath {
++        resolutionStrategy.eachDependency { DependencyResolveDetails details ->
++            if (details.requested.group == 'com.burgstaller' && details.requested.name == 'okhttp-digest') {
++                details.useTarget "io.github.rburgst:${details.requested.name}:1.21"
++                details.because 'Dependency has moved'
++            }
++        }
++    }
+ }
+ 
+ plugins {
+@@ -128,6 +138,15 @@ allprojects  {
+     repositories {
+         mavenCentral()
+     }
++
++    configurations.all {
++        resolutionStrategy.eachDependency { DependencyResolveDetails details ->
++            if (details.requested.group == 'com.burgstaller' && details.requested.name == 'okhttp-digest') {
++                details.useTarget "io.github.rburgst:${details.requested.name}:1.21"
++                details.because 'Dependency has moved'
++            }
++        }
++    }
+ 
+     apply plugin: 'com.adarshr.test-logger'
+     apply plugin: 'com.diffplug.spotless'
