@@ -95,19 +95,22 @@ Scripted simulations print structured before/after states and verify system inva
 make seed-erp
 make init-fineract
 
-# 2. Run Complete Loan Lifecycle (Part D)
+# 2. Run GL Sync Demonstration (Part A Behaviors 1-4)
+make demo-gl-sync
+
+# 3. Run Complete Loan Lifecycle (Part D)
 make simulate-lifecycle
 
-# 3. Test Sequential Duplicates (Part I1)
+# 4. Test Sequential Duplicates (Part I1)
 make simulate-duplicates
 
-# 4. Test Concurrency: 10 parallel disbursements & repayments (Part I2 & I3)
+# 5. Test Concurrency: 10 parallel disbursements & repayments (Part I2 & I3)
 make simulate-concurrency
 
-# 5. Test Failure Recovery & Fault Injection (Part J)
+# 6. Test Failure Recovery & Fault Injection (Part J)
 make simulate-failures
 
-# 6. Run Reconciliation Report (Part K)
+# 7. Run Reconciliation Report (Part K)
 make simulate-reconciliation
 ```
 
@@ -120,5 +123,14 @@ See [SIMULATIONS.md](SIMULATIONS.md) for detailed execution transcripts and befo
 * [ARCHITECTURE.md](ARCHITECTURE.md): System components, data flow, state machine, GL sync design.
 * [API.md](API.md): API contract, endpoints, payload formats, error schemas, idempotency specs.
 * [SIMULATIONS.md](SIMULATIONS.md): Detailed evidence logs for all simulations using the official template.
-* [DECISIONS.md](DECISIONS.md): Architectural decisions, trade-offs, rationale, and incident investigation walkthrough.
+* [DECISIONS.md](DECISIONS.md): Architectural decisions, trade-offs, rationale, incident walkthrough, and interview preparation.
+
+---
+
+## 7. Ground Rules & AI Disclosure
+
+In accordance with Section 14 (Ground Rules):
+* **AI Assistant Usage:** Google DeepMind Antigravity was utilized as an agentic pair-programming assistant for boilerplate scaffolding, Liquibase XML schema drafting, and property-based test fixture generation.
+* **Engineering Ownership:** All core financial invariant enforcement, database constraint design, pure double-entry accounting formulas, failure state recovery flows, and two-way reconciliation logic were authored, validated, and verified directly.
+* **Data Privacy:** Zero real personal or real financial data was used; all test identifiers and amounts are simulated SME asset financing data.
 

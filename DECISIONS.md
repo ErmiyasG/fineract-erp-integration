@@ -153,3 +153,18 @@ The engineer determines within seconds that:
 3. Mock ERP successfully booked journal entry `JE-2026-0001`.
 4. Total execution latency was 1.34s with zero retries.
 
+---
+
+## 3. Recorded Assumptions & Ambiguity Resolutions
+
+In accordance with Section 14:
+1. **GL Account Code vs. External Reference:**
+   * *Assumption:* `external_reference` uniquely keys the synchronization relationship between ERP and Fineract, while `glCode` remains Fineract's human-readable accounting code. Both must be unique. A payload with identical `external_reference` but different `glCode` is rejected with `HTTP 409 Conflict`.
+2. **Reconciliation Scope & Granularity:**
+   * *Assumption:* Two-way reconciliation operates at the individual transaction level, keyed by `external_reference`. Master data (GL accounts) reconciliation is treated as a Tier 3 stretch topic.
+3. **Reversal Pairing:**
+   * *Assumption:* When Fineract records a transaction reversal (`manuallyReversed: true`), Mock ERP records a compensating journal entry with the same reference suffixed by `-REV`. The reconciliation engine matches the pair and validates net zero ledger impact.
+4. **Loan Closure Trigger:**
+   * *Assumption:* When partial repayments plus final payoff sum to the total expected balance (principal + interest), Fineract core transitions the loan state to `Closed (obligations met)`.
+
+---

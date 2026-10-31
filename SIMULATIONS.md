@@ -17,6 +17,7 @@ This document captures reproducible evidence across all required simulations, ad
 
 | Simulation ID | Scenario Description | Command | Status |
 | :--- | :--- | :--- | :--- |
+| **SIM-A** | GL Account Sync Behaviors 1–4 (Part A) | `make demo-gl-sync` | Ready |
 | **SIM-D** | End-to-End Loan Lifecycle (App $\to$ Closed) | `make simulate-lifecycle` | Ready |
 | **SIM-I1** | Sequential Duplicates (Disbursement x4) | `make simulate-duplicates` | Ready |
 | **SIM-I2** | Concurrent Disbursements (10 Parallel Calls) | `make simulate-concurrency` | Ready |
@@ -31,6 +32,57 @@ This document captures reproducible evidence across all required simulations, ad
 ---
 
 ## 2. Evidence Logs
+
+### SIM-A: GL Synchronization Behaviors 1–4 (Part A)
+* **Description:** Demonstrates the 4 mandatory behaviors enforced inside Fineract Java core: (1) external_reference persistence, (2) identical payload returns existing entity without duplicates, (3) conflicting payload rejected with HTTP 409 Conflict, (4) protected by Fineract permission model.
+* **Full Machine Output:** Recorded in `evidence/part_a_gl_sync.txt`.
+* **Execution Command:** `make demo-gl-sync` (or `python3 scripts/demo_gl_sync.py`)
+
+#### Behavior 1: Persistence of external_reference (New Reference)
+1. **Initial State:** `acc_gl_account` table has no entry for `external_reference='GL-1200'`.
+2. **Request:** `POST /glaccounts` with `{name: 'Loan Receivable', glCode: '1200', external_reference: 'GL-1200'}`.
+3. **Response:** HTTP 200 OK -> `{resourceId: 12, glCode: '1200', external_reference: 'GL-1200'}`.
+4. **Fineract State:** Row inserted in `acc_gl_account` with `external_reference='GL-1200'`.
+5. **ERP State:** Account 1200 registered in ERP chart of accounts.
+6. **Integration State:** `gl_account_mappings` records `external_reference='GL-1200'` with `status='SYNCED'`.
+7. **Expected Result:** Account persisted with unique `external_reference`.
+8. **Actual Result:** HTTP 200 OK. Persisted successfully.
+9. **Explanation:** Custom Liquibase changeset (`0131_add_external_reference_to_acc_gl_account.xml`) and domain entity support `external_reference`.
+
+#### Behavior 2: Idempotent Resubmission (Identical Payload)
+1. **Initial State:** Account `GL-1200` already exists in Fineract core.
+2. **Request:** `POST /glaccounts` with identical payload and `external_reference='GL-1200'`.
+3. **Response:** HTTP 200 OK -> `{resourceId: 12, glCode: '1200', external_reference: 'GL-1200'}`.
+4. **Fineract State:** Zero duplicate rows inserted; existing account entity returned.
+5. **ERP State:** Master chart of accounts remains unchanged.
+6. **Integration State:** Idempotency layer returns cached mapping without creating second record.
+7. **Expected Result:** HTTP 200 OK returning existing resource without duplicate.
+8. **Actual Result:** HTTP 200 OK. Resource ID 12 returned.
+9. **Explanation:** Custom logic in `GLAccountWritePlatformServiceJpaRepositoryImpl` queries existing account by `external_reference` and returns it if payload attributes match.
+
+#### Behavior 3: Conflict Rejection (Same Reference, Different Payload)
+1. **Initial State:** Account `GL-1200` exists with `glCode='1200'`, `name='Loan Receivable'`.
+2. **Request:** `POST /glaccounts` with `external_reference='GL-1200'` but `glCode='9999'`, `name='Conflicting Account'`.
+3. **Response:** HTTP 409 Conflict -> `{developerMessage: 'GL account already exists with reference GL-1200 but conflicting attributes'}`.
+4. **Fineract State:** Database remains unchanged. No mutation permitted.
+5. **ERP State:** No change.
+6. **Integration State:** Returns HTTP 409 Conflict with details of conflicting fields.
+7. **Expected Result:** HTTP 409 Conflict.
+8. **Actual Result:** HTTP 409 Conflict (`GLAccountConflictException` mapped to 409).
+9. **Explanation:** `GLAccountConflictExceptionMapper` intercepts domain conflict and returns standard HTTP 409 status code.
+
+#### Behavior 4: Permission and Security Protection
+1. **Initial State:** Fineract API requires authenticated user with `CREATE_GLACCOUNT` permission.
+2. **Request:** `POST /glaccounts` with invalid/empty `Authorization` header.
+3. **Response:** HTTP 401 Unauthorized / HTTP 403 Forbidden.
+4. **Fineract State:** Request blocked at Spring Security filter chain.
+5. **ERP State:** No change.
+6. **Integration State:** Call blocked before reaching domain service.
+7. **Expected Result:** HTTP 401/403 rejection.
+8. **Actual Result:** HTTP 401 Unauthorized.
+9. **Explanation:** Fineract Spring Security filter chain guards all GL account operations under tenant context.
+
+---
 
 ### SIM-D: End-to-End Loan Lifecycle (Part D & H)
 * **Description:** Run loan from initial application through approval, single disbursement of 5,000,000 RWF, 3 partial repayments, and final payoff closing the loan.

@@ -1,4 +1,4 @@
-.PHONY: help build up down restart logs test test-java test-python lint format typecheck init-fineract seed-erp simulate-lifecycle simulate-duplicates simulate-concurrency simulate-failures simulate-reconciliation clean
+.PHONY: help build up down restart logs test test-java test-python lint format typecheck init-fineract seed-erp demo-gl-sync simulate-lifecycle simulate-duplicates simulate-concurrency simulate-failures simulate-reconciliation clean
 
 SHELL := /bin/bash
 
@@ -56,6 +56,9 @@ init-fineract: ## Run automated configuration for Fineract (office, currency, pr
 
 seed-erp: ## Seed chart of accounts into Mock ERP
 	python3 scripts/seed_erp.py
+
+demo-gl-sync: ## Run Part A GL account sync demonstration (Behaviors 1-4)
+	python3 scripts/demo_gl_sync.py
 
 simulate-lifecycle: ## Run end-to-end loan lifecycle simulation (Part D)
 	python3 scripts/simulate_lifecycle.py
