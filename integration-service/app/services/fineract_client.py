@@ -150,7 +150,6 @@ class FineractClient:
 
     async def get_client_by_external_id(self, client_uid: str, correlation_id: str | None = None) -> dict[str, Any] | None:
         """Looks up client by externalId (client_uid) in Fineract."""
-        # Fineract supports /clients?externalId={externalId} or /clients/external-id/{externalId}
         data = await self._get(f"clients?externalId={client_uid}", correlation_id)
         if data and isinstance(data, dict):
             page_items = data.get("pageItems", [])
@@ -267,5 +266,20 @@ class FineractClient:
         """Fetches loan transaction breakdown (principal, interest, fees, penalties)."""
         return await self._get(f"loans/{loan_id}/transactions/{transaction_id}", correlation_id)
 
+    async def find_transaction_by_external_id(
+        self,
+        loan_id: int,
+        external_id: str,
+        correlation_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Looks up a loan transaction by its externalId to resolve timeout ambiguities."""
+        loan = await self.get_loan_by_id(loan_id, correlation_id=correlation_id)
+        if loan and "transactions" in loan:
+            for txn in loan["transactions"]:
+                if txn.get("externalId") == external_id or txn.get("external_id") == external_id:
+                    return txn
+        return None
+
 
 fineract_client = FineractClient()
+

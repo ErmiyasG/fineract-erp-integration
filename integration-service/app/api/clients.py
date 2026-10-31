@@ -16,7 +16,7 @@ from app.services.client_service import (
     ClientNotFoundError,
     client_service,
 )
-from app.services.idempotency import IdempotencyConflictError
+from app.services.idempotency import IdempotencyConflictError, IdempotencyInProgressError
 
 router = APIRouter(prefix="/api/clients", tags=["Clients"])
 
@@ -48,6 +48,17 @@ async def create_client(
         )
         response.status_code = status_code
         return client_res
+    except IdempotencyInProgressError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_202_ACCEPTED,
+            detail={
+                "status": "IN_PROGRESS",
+                "message": str(exc),
+                "details": {"client_uid": request.client_uid, "external_reference": request.external_reference},
+                "correlation_id": correlation_id,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
     except (ClientConflictError, IdempotencyConflictError) as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

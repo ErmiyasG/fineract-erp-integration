@@ -86,6 +86,20 @@ class LoanMapping(Base):
     updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False)
 
 
+class DisbursementRecord(Base):
+    """
+    Enforces the Single-Disbursement Invariant at the database persistence layer.
+    loan_reference is PRIMARY KEY: guarantees that no two disbursements
+    can ever be inserted for the same loan under any race conditions.
+    """
+    __tablename__ = "disbursement_records"
+
+    loan_reference = Column(String(100), primary_key=True)
+    external_reference = Column(String(100), unique=True, nullable=False)
+    amount = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+
+
 class TransactionRecord(Base):
     """
     Persisted state machine record for financial mutations (Disbursement, Repayment).

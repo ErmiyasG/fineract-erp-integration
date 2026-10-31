@@ -16,7 +16,7 @@ from app.services.fineract_client import (
     fineract_client as default_fineract_client,
 )
 from app.services.idempotency import (
-    IdempotencyConflictError,
+    IdempotencyInProgressError,
     idempotency_service,
 )
 
@@ -58,8 +58,8 @@ class ClientService:
             return ClientResponse(**cached_body), 200
 
         if status_action == "IN_PROGRESS":
-            # Concurrent duplicate in-flight
-            raise IdempotencyConflictError(
+            # Concurrent duplicate in-flight -> 202 Accepted
+            raise IdempotencyInProgressError(
                 f"Client creation for reference '{request.external_reference}' is currently in progress."
             )
 

@@ -1,0 +1,69 @@
+==================================================================
+ SIM-J: Distributed Transaction Failure Handling & Recovery (Part J)
+ Explicit State Machine: RECEIVED -> FINERACT_PENDING -> FINERACT_DONE -> ERP_PENDING -> COMPLETED
+==================================================================
+
+===========================================================================
+SCENARIO 1: ERP Down After Fineract Success
+===========================================================================
+1. Initial State:    Loan 'LN-FAIL-1-9E20AA' approved. Mock ERP becomes unreachable after Fineract disburses.
+2. Request:          POST /api/loans/LN-FAIL-1-9E20AA/disburse (amount=5,000,000 RWF, ref='TX-SCEN-1-9E20AA'). Injected failure: erp_down_after_fineract.
+3. Response:         Caller receives HTTP 400/502 with error 'ERP unreachable'. Status reflects pending recovery.
+4. Fineract State:   Loan successfully disbursed in Fineract. Fineract transaction ID recorded. Outstanding: 5,000,000 RWF.
+5. ERP State:        Zero journal entries created in ERP during failure.
+6. Integration State:TransactionRecord saved with state='ERP_PENDING', retry_count=1, error recorded. Single-disbursement lock held.
+7. Expected Result:  ERP catches up via recovery sweep; double posting prevented by ERP-side external_reference idempotency.
+8. Actual Result:    Recovery sweep executed via POST /api/transactions/recover: ERP journal entry created, state transitioned to COMPLETED.
+9. Explanation:      The integration service does not re-disburse in Fineract. The recovery sweep reads the saved transaction breakdown and posts directly to ERP. ERP's own idempotency guarantees exactly one journal entry.
+
+===========================================================================
+SCENARIO 2: Fineract Down at Request Ingress
+===========================================================================
+1. Initial State:    Loan 'LN-FAIL-2-9E20AA' submitted. Fineract core banking engine is completely down.
+2. Request:          POST /api/loans/LN-FAIL-2-9E20AA/disburse (ref='TX-SCEN-2-9E20AA'). Injected failure: fineract_down.
+3. Response:         Caller receives HTTP 400/503 'Fineract core is unreachable'.
+4. Fineract State:   Fineract unreachable; no mutation attempted or recorded.
+5. ERP State:        No mutation in ERP.
+6. Integration State:TransactionRecord marked state='FAILED'. Idempotency record marked 'FAILED' to clear the lock.
+7. Expected Result:  Caller receives 400/503. Safe to retry: Yes, since neither system mutated.
+8. Actual Result:    Caller retries identical request with same reference upon recovery: succeeds with HTTP 200 OK.
+9. Explanation:      Because Fineract was never touched, the integration layer marks the operation FAILED, allowing immediate safe retry with the same external_reference.
+
+===========================================================================
+SCENARIO 3: Fineract Timeout After Sending (Resolved by externalId Lookup)
+===========================================================================
+1. Initial State:    Loan 'LN-FAIL-3-9E20AA' approved. HTTP socket times out after request sent to Fineract.
+2. Request:          POST /api/loans/LN-FAIL-3-9E20AA/disburse (ref='TX-SCEN-3-9E20AA'). Injected failure: fineract_timeout.
+3. Response:         Caller receives HTTP 200 OK (Timeout resolved transparently by lookup).
+4. Fineract State:   Transaction exists in Fineract with externalId='TX-SCEN-3-{uid}'.
+5. ERP State:        ERP journal entry created (DR 1200 / CR 1100).
+6. Integration State:Service invoked find_transaction_by_external_id(loan_id, external_id). Succeeded transaction resolved; state -> FINERACT_DONE -> COMPLETED.
+7. Expected Result:  Service checks Fineract via lookup before retry (never blindly re-disburses).
+8. Actual Result:    Lookup resolved transaction ID 701, avoiding duplicate core banking transaction.
+9. Explanation:      Red flag avoided: When a timeout occurs, blindly retrying a mutation can double-disburse or double-debit. Looking up by externalId confirms if Fineract executed the command before proceeding.
+
+===========================================================================
+SCENARIO 4: ERP Timeout After Entry Was Written
+===========================================================================
+1. Initial State:    Loan 'LN-FAIL-4-9E20AA' disbursed in Fineract. ERP writes journal entry but connection drops before response returned.
+2. Request:          POST /api/loans/LN-FAIL-4-9E20AA/disburse (ref='TX-SCEN-4-9E20AA'). Injected failure: erp_timeout.
+3. Response:         Initial call fails with timeout. On recovery sweep / retry: returns HTTP 200 OK.
+4. Fineract State:   Fineract loan active with 1 disbursement transaction.
+5. ERP State:        Exactly 1 journal entry exists in Mock ERP. Secondary call returned existing entry.
+6. Integration State:TransactionRecord transitioned from ERP_PENDING to COMPLETED upon idempotent response.
+7. Expected Result:  What happens on retry? ERP returns existing entry; exactly one journal entry exists.
+8. Actual Result:    Proved: ERP returned HTTP 200 with original journal entry ID; exactly 1 entry in ledger.
+9. Explanation:      Mock ERP enforces its own uniqueness on external_reference. When the integration service replays the entry with the identical reference, ERP recognizes the duplicate and returns the existing entry without re-posting.
+
+===========================================================================
+SCENARIO 5: Crash Between Fineract Success and ERP Call (Startup Recovery)
+===========================================================================
+1. Initial State:    Loan 'LN-FAIL-5-9E20AA' disbursed. Process dies before ERP HTTP request initiated.
+2. Request:          POST /api/loans/LN-FAIL-5-9E20AA/disburse (ref='TX-SCEN-5-9E20AA'). Injected failure: process_crash.
+3. Response:         Initial process killed. On application restart, startup recovery sweep completes transaction.
+4. Fineract State:   Fineract transaction ID persisted in PostgreSQL before crash.
+5. ERP State:        Journal entry posted during startup recovery sweep.
+6. Integration State:Database state: ERP_PENDING prior to restart. Sweeper detects uncompleted transaction and advances it to COMPLETED.
+7. Expected Result:  Interrupted transaction detected on restart and completed without worker queue.
+8. Actual Result:    Startup sweeper scanned pending records, completed ERP posting, marked state COMPLETED.
+9. Explanation:      Recovery without a worker is achieved via database state persistence: Fineract success and transaction ID are committed in PostgreSQL before the network call to ERP. Upon restart, a sweeper inspects all ERP_PENDING records and posts them to ERP idempotently.

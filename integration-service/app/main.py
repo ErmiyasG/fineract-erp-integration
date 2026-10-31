@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 
 from app.api.accounts import router as accounts_router
@@ -46,9 +46,26 @@ async def correlation_id_middleware(request: Request, call_next: Callable[[Reque
     return response
 
 
+from app.services.idempotency import IdempotencyInProgressError
+
+
+@app.exception_handler(IdempotencyInProgressError)
+async def idempotency_in_progress_handler(request: Request, exc: IdempotencyInProgressError) -> JSONResponse:
+    correlation_id = getattr(request.state, "correlation_id", str(uuid.uuid4()))
+    return JSONResponse(
+        status_code=status.HTTP_202_ACCEPTED,
+        content={
+            "status": "IN_PROGRESS",
+            "message": str(exc),
+            "correlation_id": correlation_id,
+            "timestamp": datetime.now(UTC).isoformat(),
+        },
+    )
+
+
 @app.exception_handler(HTTPException)
 async def custom_http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
-    if isinstance(exc.detail, dict) and "error" in exc.detail:
+    if isinstance(exc.detail, dict):
         return JSONResponse(status_code=exc.status_code, content=exc.detail)
     correlation_id = getattr(request.state, "correlation_id", str(uuid.uuid4()))
     return JSONResponse(
