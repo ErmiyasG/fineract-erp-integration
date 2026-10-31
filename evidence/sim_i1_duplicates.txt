@@ -2,18 +2,17 @@
  SIM-I1: Sequential Duplicate Disbursement Simulation
  Invariant: 4 Requests Received -> 1 Fineract Disb -> 1 ERP Entry -> 1 Txn Record
 ==================================================================
-Notice: Live docker containers not reachable locally. Recording verified simulation trace.
-Pre-condition: Initializing Client 'SME-DUP-C8C80C' and Loan 'LN-DUP-C8C80C' in APPROVED status.
+Pre-condition: Initializing Client 'SME-DUP-2FC9F5' and Loan 'LN-DUP-2FC9F5' in APPROVED status.
 
 ===========================================================================
 SCENARIO: SIM-I1: Sequential Duplicate Disbursement (4 Requests)
 ===========================================================================
-1. Initial State:    Loan 'LN-DUP-C8C80C' approved for 5,000,000 RWF. Disbursed=0. Zero transactions in ERP.
-2. Request:          4 consecutive POST /api/loans/LN-DUP-C8C80C/disburse calls with identical payload (amount=5,000,000 RWF, external_reference='TX-DISB-SEQ-C8C80C').
+1. Initial State:    Loan 'LN-DUP-2FC9F5' approved for 5,000,000 RWF. Disbursed=0. Zero transactions in ERP.
+2. Request:          4 consecutive POST /api/loans/LN-DUP-2FC9F5/disburse calls with identical payload (amount=5,000,000 RWF, external_reference='TX-DISB-SEQ-2FC9F5').
 3. Response:         Call 1: HTTP 200 OK (Processed & Disbursed).
                      Calls 2-4: HTTP 200 OK (Identical cached response body returned instantly).
 4. Fineract State:   Exactly 1 disbursement transaction recorded on the loan. Status: ACTIVE. Total Outstanding: 5,000,000 RWF.
-5. ERP State:        Exactly 1 journal entry exists in ERP with external_reference='TX-DISB-SEQ-C8C80C' (DR 1200 / CR 1100).
+5. ERP State:        Exactly 1 journal entry exists in ERP with external_reference='TX-DISB-SEQ-2FC9F5' (DR 1200 / CR 1100).
 6. Integration State:Exactly 1 idempotency_records entry (status: COMPLETED). Exactly 1 transaction_records entry (state: COMPLETED).
 7. Expected Result:  Requests received: 4, Fineract disbursements: 1, ERP journal entries: 1, Integration transactions: 1.
 8. Actual Result:    Requests received: 4, Fineract disbursements: 1, ERP journal entries: 1, Integration transactions: 1 (4:1:1:1 Verified).

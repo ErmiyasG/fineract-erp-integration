@@ -13,6 +13,7 @@ services:
       - "5433:5432"
     volumes:
       - fineract_db_data:/var/lib/postgresql/data
+      - ./scripts/init-fineract-db.sql:/docker-entrypoint-initdb.d/init-fineract-db.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U fineract -d fineract_tenants"]
       interval: 5s
@@ -30,12 +31,19 @@ services:
       dockerfile: Dockerfile
     container_name: fineract-core
     environment:
+      FINERACT_HIKARI_JDBC_URL: jdbc:postgresql://fineract-db:5432/fineract_tenants
+      FINERACT_HIKARI_USERNAME: fineract
+      FINERACT_HIKARI_PASSWORD: fineract
+      FINERACT_HIKARI_DRIVER_SOURCE_CLASS_NAME: org.postgresql.Driver
+      FINERACT_DEFAULT_TENANTDB_IDENTIFIER: default
+      FINERACT_DEFAULT_TENANTDB_NAME: fineract_default
       FINERACT_DEFAULT_TENANTDB_HOSTNAME: fineract-db
       FINERACT_DEFAULT_TENANTDB_PORT: "5432"
       FINERACT_DEFAULT_TENANTDB_UID: fineract
       FINERACT_DEFAULT_TENANTDB_PWD: fineract
       FINERACT_DEFAULT_TENANTDB_CONN_PARAMS: ""
-      FINERACT_DEFAULT_TENANTDB_NAME: fineract_default
+      FINERACT_DEFAULT_TENANTDB_TIMEZONE: UTC
+      FINERACT_DEFAULT_TENANTDB_DESCRIPTION: "Default Tenant"
       JAVA_TOOL_OPTIONS: "-Xms512m -Xmx1024m"
     ports:
       - "8443:8443"
@@ -77,7 +85,7 @@ services:
       dockerfile: Dockerfile
     container_name: mock-erp
     environment:
-      DATABASE_URL: postgresql://fintech:fintech_secret@app-db:5432/mock_erp_db
+      DATABASE_URL: postgresql+psycopg2://fintech:fintech_secret@app-db:5432/mock_erp_db
       PORT: "8001"
       LOG_LEVEL: INFO
     ports:
@@ -97,7 +105,7 @@ services:
       dockerfile: Dockerfile
     container_name: integration-service
     environment:
-      DATABASE_URL: postgresql://fintech:fintech_secret@app-db:5432/integration_db
+      DATABASE_URL: postgresql+psycopg2://fintech:fintech_secret@app-db:5432/integration_db
       FINERACT_BASE_URL: https://fineract:8443/fineract-provider/api/v1
       FINERACT_TENANT_ID: default
       FINERACT_AUTH_USER: mifos

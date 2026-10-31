@@ -12,6 +12,9 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from app.config import settings
 
 DATABASE_URL = settings.DATABASE_URL
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
+
 # In test environments or when sqlite is specified
 if os.getenv("TESTING") == "1" or "sqlite" in DATABASE_URL:
     DATABASE_URL = "sqlite:///./mock_erp_test.db"

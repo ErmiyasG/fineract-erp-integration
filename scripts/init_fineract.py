@@ -71,7 +71,7 @@ class FineractAdminClient:
 
 
 def wait_for_fineract(
-    client: FineractAdminClient, max_retries: int = 30, delay: int = 3
+    client: FineractAdminClient, max_retries: int = 60, delay: int = 3
 ) -> bool:
     print(f"Checking Fineract availability at {client.base_url}...")
     for attempt in range(1, max_retries + 1):
@@ -145,6 +145,7 @@ def configure_gl_accounts(client: FineractAdminClient) -> dict[str, int]:
     gl_accounts_to_seed = {
         "1100": ("Bank Main Account", 1, "GL-1100"),
         "1200": ("Loan Receivable", 1, "GL-1200"),
+        "2100": ("Suspense / Overpayment Liability", 2, "GL-2100"),
         "4000": ("Interest Income", 4, "GL-4000"),
         "4100": ("Fee Income", 4, "GL-4100"),
         "4200": ("Penalty Income", 4, "GL-4200"),
@@ -206,6 +207,7 @@ def configure_loan_product(client: FineractAdminClient, gl_map: dict[str, int]) 
     # Fallback to available GL account IDs
     bank_id = gl_map.get("1100", 1)
     rec_id = gl_map.get("1200", 2)
+    liability_id = gl_map.get("2100", 7)
     interest_id = gl_map.get("4000", 3)
     fee_id = gl_map.get("4100", interest_id)
     penalty_id = gl_map.get("4200", interest_id)
@@ -227,7 +229,6 @@ def configure_loan_product(client: FineractAdminClient, gl_map: dict[str, int]) 
         "repaymentFrequencyType": 2,  # Months
         "interestRatePerPeriod": 1.5,  # 18% nominal annual / 12 months = 1.5% per month
         "interestRateFrequencyType": 2,  # Per Month
-        "annualInterestRate": 18.0,
         "amortizationType": 1,  # Equal installments
         "interestType": 0,  # Declining Balance
         "interestCalculationPeriodType": 1,  # Same as repayment period
@@ -241,8 +242,9 @@ def configure_loan_product(client: FineractAdminClient, gl_map: dict[str, int]) 
         "interestOnLoanAccountId": interest_id,
         "incomeFromFeeAccountId": fee_id,
         "incomeFromPenaltyAccountId": penalty_id,
+        "incomeFromRecoveryAccountId": interest_id,
         "writeOffAccountId": loss_id,
-        "overpaymentAccountId": bank_id,
+        "overpaymentLiabilityAccountId": liability_id,
         "transfersInSuspenseAccountId": bank_id,
         "multiDisburseLoan": False,
         "locale": "en",

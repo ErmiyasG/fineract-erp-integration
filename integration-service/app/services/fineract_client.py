@@ -157,6 +157,7 @@ class FineractClient:
             "firstname": first_name,
             "lastname": last_name,
             "externalId": client_uid,
+            "legalFormId": 1,
             "active": True,
             "activationDate": activation_date,
             "dateFormat": "yyyy-MM-dd",
@@ -180,6 +181,15 @@ class FineractClient:
     ) -> dict[str, Any] | None:
         return await self._get(f"clients/{client_id}", correlation_id)
 
+    async def get_loan_products(
+        self, correlation_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Fetches list of loan products."""
+        data = await self._get("loanproducts", correlation_id)
+        if isinstance(data, list):
+            return data
+        return []
+
     # -------------------------------------------------------------------------
     # Loan Methods (Part D & E)
     # -------------------------------------------------------------------------
@@ -198,6 +208,7 @@ class FineractClient:
         payload = {
             "clientId": client_id,
             "productId": product_id,
+            "loanType": "individual",
             "principal": principal,
             "loanTermFrequency": term_months,
             "loanTermFrequencyType": 2,  # Months
@@ -266,7 +277,7 @@ class FineractClient:
             "dateFormat": "yyyy-MM-dd",
             "locale": "en",
         }
-        return await self._post(f"loans/{loan_id}?command=repayment", payload, correlation_id)
+        return await self._post(f"loans/{loan_id}/transactions?command=repayment", payload, correlation_id)
 
     async def get_loan_by_id(
         self, loan_id: int, correlation_id: str | None = None

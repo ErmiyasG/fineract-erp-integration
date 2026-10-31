@@ -102,10 +102,18 @@ class LoanLifecycleService:
             )
 
         try:
+            # Resolve product_id if default 1 is not present
+            target_product_id = request.product_id
+            products = await self.fineract_client.get_loan_products(correlation_id)
+            if products:
+                available_ids = [p["id"] for p in products if "id" in p]
+                if target_product_id not in available_ids and available_ids:
+                    target_product_id = available_ids[0]
+
             # 3. Create Loan in Fineract
             fineract_resp = await self.fineract_client.create_loan_application(
                 client_id=client_map.fineract_client_id,
-                product_id=request.product_id,
+                product_id=target_product_id,
                 loan_reference=request.loan_reference,
                 principal=request.principal,
                 term_months=request.term_months,
