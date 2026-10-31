@@ -260,4 +260,90 @@ To guarantee a loan can never be disbursed more than once:
 2. **Database Unique Constraint:** Unique index on `transaction_records(loan_reference)` where `operation_type = 'DISBURSEMENT'`.
 3. **Core Banking Engine Validation:** Fineract rejects disbursement commands on loans that are no longer in `APPROVED` status.
 
+---
+
+## 8. Failure Handling & Distributed State Recovery (Part J)
+
+### 8.1 Transaction State Machine
+Distributed financial operations advance through an explicit persisted state machine in PostgreSQL:
+
+```mermaid
+stateDiagram-v2
+    [*] --> RECEIVED: Ingress request validated
+    RECEIVED --> FINERACT_PENDING: Idempotency lock acquired
+    FINERACT_PENDING --> FAILED: Fineract down (Safe to retry)
+    FINERACT_PENDING --> FINERACT_DONE: Fineract mutation confirmed
+    FINERACT_PENDING --> FINERACT_DONE: Timeout resolved via externalId lookup
+    FINERACT_DONE --> ERP_PENDING: Fineract success committed to DB
+    ERP_PENDING --> COMPLETED: ERP journal entry confirmed
+    ERP_PENDING --> FAILED_ERP: ERP unreachable (Eligible for sweep/repair)
+    FAILED_ERP --> COMPLETED: Background sweep or explicit repair
+    COMPLETED --> [*]
+```
+
+### 8.2 Recovery Mechanics Without Worker Queue
+1. **Database-Committed Checkpoints:** Before calling Mock ERP over the network, the Fineract transaction ID and breakdown are committed to PostgreSQL (`state: ERP_PENDING`).
+2. **Crash Resilience:** If the application process crashes, restarts, or loses power between Fineract success and ERP posting, the startup recovery sweep (`run_startup_recovery`) detects uncompleted `ERP_PENDING` records.
+3. **Lookup-Before-Retry:** Network timeouts to Fineract never trigger blind re-submissions. The service queries Fineract by `externalId`. If the transaction exists, it proceeds directly to ERP posting.
+4. **ERP-Side Idempotency:** When the recovery sweeper replays entries to Mock ERP, ERP recognizes duplicate `external_reference` values and returns the existing journal entry without re-posting.
+
+---
+
+## 9. Concurrency Architecture & Defense-in-Depth (Part I)
+
+### 9.1 Multi-Layer Defense Matrix
+
+| Layer | Component | Mechanism | Protection Scope |
+| :--- | :--- | :--- | :--- |
+| **Layer 1** | Ingress Idempotency Filter | `idempotency_records` table check | Filters sequential duplicates and in-flight identical requests |
+| **Layer 2** | Relational Database Locks & Constraints | PostgreSQL `disbursement_records(loan_reference)` PK | Atomically rejects concurrent disbursement races with `409 Conflict` |
+| **Layer 3** | Core Banking External ID | Fineract `externalId` uniqueness constraint | Prevents duplicate transaction insertion within core banking |
+| **Layer 4** | Core Loan State Machine | Fineract `m_loan.loan_status_id` validation | **Last line of defence**: Enforces loan must be `APPROVED` to disburse |
+
+---
+
+## 10. Two-Way Transaction Reconciliation Engine (Part K)
+
+### 10.1 Engine Architecture
+The reconciliation engine performs an independent two-way comparison between Fineract loan transactions and Mock ERP general ledger journal entries:
+
+```mermaid
+flowchart TD
+    Request["POST /api/reconciliation\n(filters: dates, references)"] --> ReconService["ReconciliationService"]
+    ReconService --> QueryFin["Query Fineract Transactions\n(via Loan Transactions API)"]
+    ReconService --> QueryERP["Query Mock ERP Journal Entries\n(via Journal Entries API)"]
+    QueryFin --> Compare["Compare by external_reference\n& amounts (tolerance 0.01 RWF)"]
+    QueryERP --> Compare
+    Compare --> Eval["Evaluate Outcomes:\n- MATCHED\n- MISSING_IN_ERP\n- MISSING_IN_FINERACT\n- AMOUNT_MISMATCH"]
+    Eval --> Report["Return Reconciliation Report\n(Read-Only: Zero DB mutations)"]
+    
+    RepairReq["POST /api/reconciliation/repair\n(references: [...])"] --> RecoveryService["RecoveryService"]
+    RecoveryService --> PostERP["Post Missing Entries to ERP\n(Idempotent by external_reference)"]
+    PostERP --> MarkCompleted["Update TransactionRecord to COMPLETED"]
+```
+
+### 10.2 Discrepancy Classification
+1. **`MATCHED`:** Confirmed in both systems; amounts match within 0.01 RWF tolerance.
+2. **`MISSING_IN_ERP`:** Fineract loan transaction exists (`fineract_transaction_id` recorded), but no matching entry exists in ERP.
+3. **`MISSING_IN_FINERACT`:** ERP journal entry exists, but no matching loan transaction exists in Fineract.
+4. **`AMOUNT_MISMATCH`:** Present in both systems, but amounts differ beyond 0.01 tolerance ($\Delta = \text{Amount}_{\text{ERP}} - \text{Amount}_{\text{Fineract}}$).
+5. **Reversal Handling:** Reversed Fineract transactions (`manuallyReversed: true`) are paired with ERP compensating reversal journal entries (`DISBURSEMENT_REVERSAL` or `REPAYMENT_REVERSAL`), confirming net zero financial impact.
+
+---
+
+## 11. Observability Architecture & Correlated Logging (Section 9)
+
+### 11.1 Structured JSON Logging
+All application logs are emitted as single-line structured JSON to `stdout` containing the mandatory correlation context:
+* `timestamp`: ISO-8601 UTC timestamp.
+* `correlation_id`: Distributed trace UUID passed via `X-Correlation-ID` header.
+* `external_reference`: Business transaction idempotency key.
+* `client_uid`: External client business identifier.
+* `loan_reference`: External loan business identifier.
+* `fineract_transaction_id`: Internal Fineract transaction identifier (when available).
+* `erp_transaction_id`: Mock ERP journal entry identifier (when available).
+* `status`: Current state machine step (`RECEIVED`, `FINERACT_PENDING`, `FINERACT_DONE`, `ERP_PENDING`, `COMPLETED`, `FAILED`).
+* `message`: Human-readable log narrative.
+
+
 

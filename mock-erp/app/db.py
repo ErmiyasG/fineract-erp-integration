@@ -2,6 +2,7 @@
 Database configuration and session management for Mock ERP.
 Supports PostgreSQL in production/docker and SQLite fallback for local testing.
 """
+
 import os
 from collections.abc import Generator
 
@@ -20,7 +21,9 @@ else:
         engine = create_engine(DATABASE_URL, pool_pre_ping=True)
     except Exception:
         # Fallback for environments where postgres driver is not yet ready
-        engine = create_engine("sqlite:///./mock_erp_local.db", connect_args={"check_same_thread": False})
+        engine = create_engine(
+            "sqlite:///./mock_erp_local.db", connect_args={"check_same_thread": False}
+        )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

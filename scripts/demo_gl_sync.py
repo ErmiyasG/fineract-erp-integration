@@ -7,6 +7,7 @@ Demonstrates:
   Behavior 3: Same reference with different payload rejected with conflict (HTTP 409)
   Behavior 4: Endpoint protected by Fineract permission model (HTTP 401/403)
 """
+
 import uuid
 
 import httpx
@@ -49,53 +50,84 @@ def demo_direct_fineract_sync():
         # Behavior 1: New Reference -> Process Once & Persist
         # -------------------------------------------------------------
         print("\n--> Behavior 1: Creating GL Account with new external_reference...")
-        print(f"    Payload: external_reference='{external_ref}', code='{gl_code}', name='{payload_initial['name']}'")
+        print(
+            f"    Payload: external_reference='{external_ref}', code='{gl_code}', name='{payload_initial['name']}'"
+        )
         try:
-            res1 = client.post(f"{FINERACT_BASE_URL}/glaccounts", json=payload_initial, headers=headers)
+            res1 = client.post(
+                f"{FINERACT_BASE_URL}/glaccounts", json=payload_initial, headers=headers
+            )
             print(f"    [Behavior 1 Response] HTTP {res1.status_code}: {res1.text}")
             account_id_1 = res1.json().get("resourceId")
             print(f"    Account Created successfully with ID: {account_id_1}")
         except (httpx.HTTPError, ValueError) as e:
-            print(f"    [Notice] Live Fineract not running locally yet ({e}). Demonstrating contract via Integration Service mock/API...")
+            print(
+                f"    [Notice] Live Fineract not running locally yet ({e}). Demonstrating contract via Integration Service mock/API..."
+            )
             demo_integration_service_sync()
-            return 
+            return
 
         # -------------------------------------------------------------
         # Behavior 2: Same Reference, Identical Payload -> Return Existing (No Duplicate)
         # -------------------------------------------------------------
-        print("\n--> Behavior 2: Sending identical request with same external_reference...")
-        res2 = client.post(f"{FINERACT_BASE_URL}/glaccounts", json=payload_initial, headers=headers)
+        print(
+            "\n--> Behavior 2: Sending identical request with same external_reference..."
+        )
+        res2 = client.post(
+            f"{FINERACT_BASE_URL}/glaccounts", json=payload_initial, headers=headers
+        )
         print(f"    [Behavior 2 Response] HTTP {res2.status_code}: {res2.text}")
         account_id_2 = res2.json().get("resourceId")
-        assert account_id_1 == account_id_2, "Must return existing account ID without creating duplicate"
-        print(f"    Verified: returned existing ID {account_id_2} (no duplicate created).")
+        assert account_id_1 == account_id_2, (
+            "Must return existing account ID without creating duplicate"
+        )
+        print(
+            f"    Verified: returned existing ID {account_id_2} (no duplicate created)."
+        )
 
         # -------------------------------------------------------------
         # Behavior 3: Same Reference, Different Payload -> Reject with 409 Conflict
         # -------------------------------------------------------------
-        print("\n--> Behavior 3: Sending request with same external_reference but conflicting payload...")
+        print(
+            "\n--> Behavior 3: Sending request with same external_reference but conflicting payload..."
+        )
         payload_conflicting = dict(payload_initial)
         payload_conflicting["name"] = "Conflicting Account Name"
         payload_conflicting["glCode"] = f"CONFLICT-{uuid.uuid4().hex[:4]}"
 
-        res3 = client.post(f"{FINERACT_BASE_URL}/glaccounts", json=payload_conflicting, headers=headers)
+        res3 = client.post(
+            f"{FINERACT_BASE_URL}/glaccounts", json=payload_conflicting, headers=headers
+        )
         print(f"    [Behavior 3 Response] HTTP {res3.status_code}: {res3.text}")
-        assert res3.status_code == 409, f"Expected HTTP 409 Conflict, received {res3.status_code}"
+        assert res3.status_code == 409, (
+            f"Expected HTTP 409 Conflict, received {res3.status_code}"
+        )
         print("    Verified: Conflicting payload rejected with HTTP 409 Conflict.")
 
         # -------------------------------------------------------------
         # Behavior 4: Protected by Fineract Permission Model
         # -------------------------------------------------------------
         print("\n--> Behavior 4: Requesting endpoint without credentials...")
-        unauth_headers = {"Fineract-Platform-TenantId": "default", "Content-Type": "application/json"}
-        res4 = client.post(f"{FINERACT_BASE_URL}/glaccounts", json=payload_initial, headers=unauth_headers)
+        unauth_headers = {
+            "Fineract-Platform-TenantId": "default",
+            "Content-Type": "application/json",
+        }
+        res4 = client.post(
+            f"{FINERACT_BASE_URL}/glaccounts",
+            json=payload_initial,
+            headers=unauth_headers,
+        )
         print(f"    [Behavior 4 Response] HTTP {res4.status_code}: {res4.text}")
-        assert res4.status_code in (401, 403), f"Expected HTTP 401/403, received {res4.status_code}"
+        assert res4.status_code in (401, 403), (
+            f"Expected HTTP 401/403, received {res4.status_code}"
+        )
         print("    Verified: Protected by Fineract security and permission checks.")
 
 
 def demo_integration_service_sync():
-    print_header("DEMONSTRATION: INTEGRATION SERVICE GL SYNC ENDPOINT (POST /api/accounts/sync)")
+    print_header(
+        "DEMONSTRATION: INTEGRATION SERVICE GL SYNC ENDPOINT (POST /api/accounts/sync)"
+    )
 
     external_ref = f"GL-ERP-{uuid.uuid4().hex[:6].upper()}"
     code = f"12{uuid.uuid4().hex[:4].upper()}"
@@ -117,7 +149,9 @@ def demo_integration_service_sync():
         print("\n--> 2. Repeated sync 4 consecutive times (idempotency test)...")
         for i in range(1, 5):
             r = client.post("/api/accounts/sync", json=payload)
-            print(f"    Call {i}: HTTP {r.status_code} - Status: {r.json().get('status')}")
+            print(
+                f"    Call {i}: HTTP {r.status_code} - Status: {r.json().get('status')}"
+            )
 
         print("\n--> 3. Attempting sync with same reference but conflicting payload...")
         bad_payload = dict(payload)
@@ -129,4 +163,3 @@ def demo_integration_service_sync():
 
 if __name__ == "__main__":
     demo_direct_fineract_sync()
-

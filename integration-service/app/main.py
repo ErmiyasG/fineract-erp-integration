@@ -2,6 +2,7 @@
 Financial Integration Service Application
 Connects Financing Partners, Apache Fineract Core Banking, and Mock ERP.
 """
+
 import uuid
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
@@ -17,10 +18,13 @@ from app.api.loans import router as loans_router
 from app.api.reconciliation import router as reconciliation_router
 from app.api.transactions import router as transactions_router
 from app.core.db import init_db
+from app.core.logging import setup_structured_logging
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    # Initialize structured JSON logging
+    setup_structured_logging()
     # Initialize database tables on startup
     try:
         init_db()
@@ -38,7 +42,9 @@ app = FastAPI(
 
 
 @app.middleware("http")
-async def correlation_id_middleware(request: Request, call_next: Callable[[Request], Any]) -> Response:
+async def correlation_id_middleware(
+    request: Request, call_next: Callable[[Request], Any]
+) -> Response:
     correlation_id = request.headers.get("X-Correlation-ID") or str(uuid.uuid4())
     request.state.correlation_id = correlation_id
     response: Response = await call_next(request)
@@ -50,7 +56,9 @@ from app.services.idempotency import IdempotencyInProgressError
 
 
 @app.exception_handler(IdempotencyInProgressError)
-async def idempotency_in_progress_handler(request: Request, exc: IdempotencyInProgressError) -> JSONResponse:
+async def idempotency_in_progress_handler(
+    request: Request, exc: IdempotencyInProgressError
+) -> JSONResponse:
     correlation_id = getattr(request.state, "correlation_id", str(uuid.uuid4()))
     return JSONResponse(
         status_code=status.HTTP_202_ACCEPTED,

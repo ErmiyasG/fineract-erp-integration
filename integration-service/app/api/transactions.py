@@ -2,6 +2,7 @@
 Transactions API Endpoints (Parts E & F & J)
 Provides state machine status, observability, and explicit recovery sweeps.
 """
+
 import uuid
 from datetime import UTC, datetime
 from typing import Any

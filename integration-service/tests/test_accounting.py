@@ -9,6 +9,7 @@ Tests all accounting transformations derived from Fineract transaction breakdown
 - Repayment Reversal: DR 1200 / DR 4000 / CR 1100
 - Unbalanced error verification
 """
+
 import pytest
 
 from app.services.accounting import (

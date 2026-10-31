@@ -3,6 +3,7 @@ Mock ERP REST API Application.
 Implements Chart of Accounts management and balanced General Ledger journal entries.
 Enforces idempotency on external_reference and self-contained uniqueness validation.
 """
+
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -64,7 +65,9 @@ def create_or_sync_account(
     - Reused code with different reference: rejects with 409 Conflict
     """
     existing_by_ref = (
-        db.query(Account).filter(Account.external_reference == account_in.external_reference).first()
+        db.query(Account)
+        .filter(Account.external_reference == account_in.external_reference)
+        .first()
     )
     if existing_by_ref:
         if (
@@ -318,9 +321,7 @@ def get_journal_entry(
 ) -> JournalEntryResponse:
     """Retrieves a posted journal entry by its external_reference."""
     entry = (
-        db.query(JournalEntry)
-        .filter(JournalEntry.external_reference == external_reference)
-        .first()
+        db.query(JournalEntry).filter(JournalEntry.external_reference == external_reference).first()
     )
     if not entry:
         raise HTTPException(

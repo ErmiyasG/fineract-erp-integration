@@ -3,6 +3,7 @@ Client Management Service (Part C)
 Encapsulates Fineract client lifecycle and isolates internal numeric IDs.
 Enforces business client_uid identity mapped to Fineract externalId.
 """
+
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
@@ -30,7 +31,6 @@ class ClientNotFoundError(Exception):
 
 
 class ClientService:
-
     def __init__(self, fineract_client: FineractClient | None = None):
         self.fineract_client = fineract_client or default_fineract_client
 
@@ -65,9 +65,7 @@ class ClientService:
 
         # Validate that client_uid is unique in our database
         existing_uid = (
-            db.query(ClientMapping)
-            .filter(ClientMapping.client_uid == request.client_uid)
-            .first()
+            db.query(ClientMapping).filter(ClientMapping.client_uid == request.client_uid).first()
         )
         if existing_uid:
             idempotency_service.mark_failed(db, "CREATE_CLIENT", request.external_reference)
@@ -135,11 +133,7 @@ class ClientService:
         Validates existence and active status.
         Never exposes Fineract numeric ID.
         """
-        mapping = (
-            db.query(ClientMapping)
-            .filter(ClientMapping.client_uid == client_uid)
-            .first()
-        )
+        mapping = db.query(ClientMapping).filter(ClientMapping.client_uid == client_uid).first()
 
         if not mapping:
             # Check Fineract directly by externalId

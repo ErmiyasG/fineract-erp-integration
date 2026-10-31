@@ -47,7 +47,7 @@ This project relies on pinned upstream versions to ensure deterministic, reprodu
 ### Start All Services
 ```bash
 # Clone and enter the repository
-cd inkomoko-assessment
+cd fineract-erp-integration
 
 # Start all containers in the background
 make up

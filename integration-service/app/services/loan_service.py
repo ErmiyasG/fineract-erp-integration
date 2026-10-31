@@ -7,6 +7,7 @@ Orchestrates:
 4. ERP double-entry posting derived from actual Fineract data
 5. Distributed transaction state machine with lookup before retry and failure recovery
 """
+
 from datetime import UTC, datetime
 
 import httpx
@@ -49,7 +50,6 @@ class LoanNotFoundError(Exception):
 
 
 class LoanLifecycleService:
-
     def __init__(
         self,
         fineract_client: FineractClient | None = None,
@@ -89,15 +89,11 @@ class LoanLifecycleService:
         )
         if existing_loan:
             idempotency_service.mark_failed(db, "CREATE_LOAN", request.external_reference)
-            raise LoanConflictError(
-                f"Loan reference '{request.loan_reference}' is already in use."
-            )
+            raise LoanConflictError(f"Loan reference '{request.loan_reference}' is already in use.")
 
         # 2. Resolve client_uid
         client_map = (
-            db.query(ClientMapping)
-            .filter(ClientMapping.client_uid == request.client_uid)
-            .first()
+            db.query(ClientMapping).filter(ClientMapping.client_uid == request.client_uid).first()
         )
         if not client_map:
             idempotency_service.mark_failed(db, "CREATE_LOAN", request.external_reference)
@@ -180,11 +176,7 @@ class LoanLifecycleService:
         correlation_id: str | None = None,
     ) -> LoanResponse:
         """Explicitly approves a loan submitted in Fineract."""
-        mapping = (
-            db.query(LoanMapping)
-            .filter(LoanMapping.loan_reference == loan_reference)
-            .first()
-        )
+        mapping = db.query(LoanMapping).filter(LoanMapping.loan_reference == loan_reference).first()
         if not mapping:
             raise LoanNotFoundError(f"Loan reference '{loan_reference}' not found.")
 
@@ -214,11 +206,7 @@ class LoanLifecycleService:
         correlation_id: str | None = None,
     ) -> LoanResponse:
         """Retrieves loan status and real-time outstanding balance from Fineract."""
-        mapping = (
-            db.query(LoanMapping)
-            .filter(LoanMapping.loan_reference == loan_reference)
-            .first()
-        )
+        mapping = db.query(LoanMapping).filter(LoanMapping.loan_reference == loan_reference).first()
         if not mapping:
             raise LoanNotFoundError(f"Loan reference '{loan_reference}' not found.")
 
@@ -291,11 +279,7 @@ class LoanLifecycleService:
                 f"Disbursement for reference '{request.external_reference}' is currently in progress."
             )
 
-        mapping = (
-            db.query(LoanMapping)
-            .filter(LoanMapping.loan_reference == loan_reference)
-            .first()
-        )
+        mapping = db.query(LoanMapping).filter(LoanMapping.loan_reference == loan_reference).first()
         if not mapping:
             idempotency_service.mark_failed(db, "DISBURSEMENT", request.external_reference)
             raise LoanNotFoundError(f"Loan reference '{loan_reference}' not found.")
@@ -367,7 +351,9 @@ class LoanLifecycleService:
         # Fault Injection Scenario 2: Fineract Down at request ingress
         if simulate_failure == "fineract_down":
             txn_record.state = "FAILED"
-            txn_record.error_message = "Simulated failure: Fineract core is unavailable at request ingress."
+            txn_record.error_message = (
+                "Simulated failure: Fineract core is unavailable at request ingress."
+            )
             db.delete(disb_record)
             db.commit()
             idempotency_service.mark_failed(db, "DISBURSEMENT", request.external_reference)
@@ -408,7 +394,9 @@ class LoanLifecycleService:
                 else:
                     # Confirmed not executed
                     txn_record.state = "FAILED"
-                    txn_record.error_message = f"Fineract disburse timed out and not found on lookup: {exc}"
+                    txn_record.error_message = (
+                        f"Fineract disburse timed out and not found on lookup: {exc}"
+                    )
                     db.delete(disb_record)
                     db.commit()
                     idempotency_service.mark_failed(db, "DISBURSEMENT", request.external_reference)
@@ -421,7 +409,9 @@ class LoanLifecycleService:
 
             # Fault Injection Scenario 5: Process crash between Fineract success and ERP call
             if simulate_failure == "process_crash":
-                raise RuntimeError("Simulated process crash between Fineract success and ERP posting")
+                raise RuntimeError(
+                    "Simulated process crash between Fineract success and ERP posting"
+                )
 
             # 2. Derive journal entries: DR 1200 Loan Receivable / CR 1100 Bank
             journal_def = derive_journal_entries_from_breakdown(
@@ -435,7 +425,9 @@ class LoanLifecycleService:
             # Fault Injection Scenario 1: ERP down after Fineract success
             if simulate_failure == "erp_down_after_fineract":
                 txn_record.state = "ERP_PENDING"
-                txn_record.error_message = "Simulated failure: ERP connection refused after Fineract disbursement"
+                txn_record.error_message = (
+                    "Simulated failure: ERP connection refused after Fineract disbursement"
+                )
                 db.commit()
                 raise httpx.ConnectError("Simulated failure: Mock ERP is unreachable")
 
@@ -494,7 +486,12 @@ class LoanLifecycleService:
 
             return response, 200
 
-        except (IdempotencyConflictError, IdempotencyInProgressError, LoanConflictError, LoanNotFoundError):
+        except (
+            IdempotencyConflictError,
+            IdempotencyInProgressError,
+            LoanConflictError,
+            LoanNotFoundError,
+        ):
             raise
         except Exception as exc:
             if txn_record.state != "ERP_PENDING":
@@ -532,11 +529,7 @@ class LoanLifecycleService:
                 f"Repayment for reference '{request.external_reference}' is currently in progress."
             )
 
-        mapping = (
-            db.query(LoanMapping)
-            .filter(LoanMapping.loan_reference == loan_reference)
-            .first()
-        )
+        mapping = db.query(LoanMapping).filter(LoanMapping.loan_reference == loan_reference).first()
         if not mapping:
             idempotency_service.mark_failed(db, "REPAYMENT", request.external_reference)
             raise LoanNotFoundError(f"Loan reference '{loan_reference}' not found.")
@@ -567,7 +560,9 @@ class LoanLifecycleService:
         # Fault Injection Scenario 2: Fineract Down
         if simulate_failure == "fineract_down":
             txn_record.state = "FAILED"
-            txn_record.error_message = "Simulated failure: Fineract core is unavailable at request ingress."
+            txn_record.error_message = (
+                "Simulated failure: Fineract core is unavailable at request ingress."
+            )
             db.commit()
             idempotency_service.mark_failed(db, "REPAYMENT", request.external_reference)
             raise FineractConnectionException("Simulated failure: Fineract core is unreachable.")
@@ -604,7 +599,9 @@ class LoanLifecycleService:
                     fineract_txn_id = resolved["id"]
                 else:
                     txn_record.state = "FAILED"
-                    txn_record.error_message = f"Fineract repayment timed out and not found on lookup: {exc}"
+                    txn_record.error_message = (
+                        f"Fineract repayment timed out and not found on lookup: {exc}"
+                    )
                     db.commit()
                     idempotency_service.mark_failed(db, "REPAYMENT", request.external_reference)
                     raise
@@ -615,7 +612,9 @@ class LoanLifecycleService:
 
             # Fault Injection Scenario 5: Process crash between Fineract and ERP
             if simulate_failure == "process_crash":
-                raise RuntimeError("Simulated process crash between Fineract success and ERP posting")
+                raise RuntimeError(
+                    "Simulated process crash between Fineract success and ERP posting"
+                )
 
             # 2. Retrieve transaction breakdown from Fineract
             txn_breakdown = {
@@ -646,7 +645,9 @@ class LoanLifecycleService:
             # Fault Injection Scenario 1: ERP down after Fineract success
             if simulate_failure == "erp_down_after_fineract":
                 txn_record.state = "ERP_PENDING"
-                txn_record.error_message = "Simulated failure: ERP connection refused after Fineract repayment"
+                txn_record.error_message = (
+                    "Simulated failure: ERP connection refused after Fineract repayment"
+                )
                 db.commit()
                 raise httpx.ConnectError("Simulated failure: Mock ERP is unreachable")
 
@@ -717,7 +718,12 @@ class LoanLifecycleService:
 
             return response, 200
 
-        except (IdempotencyConflictError, IdempotencyInProgressError, LoanConflictError, LoanNotFoundError):
+        except (
+            IdempotencyConflictError,
+            IdempotencyInProgressError,
+            LoanConflictError,
+            LoanNotFoundError,
+        ):
             raise
         except Exception as exc:
             if txn_record.state != "ERP_PENDING":

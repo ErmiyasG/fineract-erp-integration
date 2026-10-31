@@ -3,6 +3,7 @@ End-to-End Loan Lifecycle Integration Test (Part D & H)
 Simulates complete loan lifecycle from application to closed obligations met:
 Application -> Approval -> Disbursement -> 3 Partial Repayments -> Final Payoff -> Closed
 """
+
 from unittest.mock import AsyncMock
 
 import pytest
@@ -181,7 +182,10 @@ def test_full_loan_lifecycle_simulation(test_client, mock_fineract, mock_erp):
         },
     )
     assert res_disb_dup.status_code == 409
-    assert "Single-disbursement invariant prohibits multiple disbursements" in res_disb_dup.json()["error"]["message"]
+    assert (
+        "Single-disbursement invariant prohibits multiple disbursements"
+        in res_disb_dup.json()["error"]["message"]
+    )
 
     # -------------------------------------------------------------------------
     # STAGES 5, 6, 7: Three Partial Repayments
@@ -230,9 +234,17 @@ def test_full_loan_lifecycle_simulation(test_client, mock_fineract, mock_erp):
         # Debit Bank 1100
         assert lines[0] == {"account_code": "1100", "entry_type": "DEBIT", "amount": amount}
         # Credit Loan Receivable 1200 (principal)
-        assert lines[1] == {"account_code": "1200", "entry_type": "CREDIT", "amount": principal_portion}
+        assert lines[1] == {
+            "account_code": "1200",
+            "entry_type": "CREDIT",
+            "amount": principal_portion,
+        }
         # Credit Interest Income 4000 (interest)
-        assert lines[2] == {"account_code": "4000", "entry_type": "CREDIT", "amount": interest_portion}
+        assert lines[2] == {
+            "account_code": "4000",
+            "entry_type": "CREDIT",
+            "amount": interest_portion,
+        }
 
     # -------------------------------------------------------------------------
     # STAGE 8: Final Payoff -> Transition to Closed (obligations met)

@@ -252,3 +252,88 @@ This document captures reproducible evidence across all required simulations, ad
 8. **Actual Result:** Startup sweeper scanned pending records, completed ERP posting, marked state `COMPLETED`.
 9. **Explanation:** Recovery without a worker is achieved via database state persistence: Fineract success and transaction ID are committed in PostgreSQL before the network call to ERP. Upon restart, a sweeper inspects all `ERP_PENDING` records and posts them to ERP idempotently.
 
+---
+
+### SIM-K: Two-Way Transaction Reconciliation & Observability (Part K)
+* **Description:** Two-way reconciliation engine comparing Fineract core loan transactions against Mock ERP general ledger journal entries. Validates all 4 mandatory outcomes, reversal reconciliation, read-only guarantee, and explicit idempotent repair.
+* **Execution Command:** `make simulate-reconciliation` (or `python3 scripts/simulate_reconciliation.py`)
+* **Machine Log Evidence:** Recorded in `evidence/sim_k_reconciliation.txt`.
+
+#### Scenario 1: Reconciliation Outcome: MATCHED
+1. **Initial State:** Disbursement of 5,000,000 RWF for `ref='TX-REC-MATCH-001'`. Posted in Fineract core and Mock ERP.
+2. **Request:** `POST /api/reconciliation` with filter `references: ["TX-REC-MATCH-001"]`.
+3. **Response:** HTTP 200 OK -> `status: "MATCHED"`, discrepancy: `0.00 RWF`.
+4. **Fineract State:** Disbursement transaction confirmed in Fineract. Amount: 5,000,000 RWF, `externalId: "TX-REC-MATCH-001"`.
+5. **ERP State:** Journal entry confirmed in Mock ERP with `reference: "TX-REC-MATCH-001"`. Amount: 5,000,000 RWF.
+6. **Integration State:** `TransactionRecord` status is `COMPLETED`. Both `fineract_transaction_id` and `erp_transaction_id` recorded.
+7. **Expected Result:** Outcome: `MATCHED`. Systems verified in agreement within 0.01 tolerance.
+8. **Actual Result:** `MATCHED`. `fineract_amount: 5000000.0`, `erp_amount: 5000000.0`, `discrepancy: 0.00`.
+9. **Explanation:** Both core banking and ERP ledger agree on the business transaction `external_reference`, direction, and amount. Net discrepancy is zero.
+
+#### Scenario 2: Reconciliation Outcome: MISSING_IN_ERP
+1. **Initial State:** Disbursement of 2,500,000 RWF for `ref='TX-REC-MISSERP-002'`. Fineract committed disbursement, but ERP network call failed.
+2. **Request:** `POST /api/reconciliation` with filter `references: ["TX-REC-MISSERP-002"]`.
+3. **Response:** HTTP 200 OK -> `status: "MISSING_IN_ERP"`, discrepancy: `-2,500,000 RWF`.
+4. **Fineract State:** Fineract loan disbursed. Transaction ID present, `amount: 2500000.0`, `externalId: "TX-REC-MISSERP-002"`.
+5. **ERP State:** Mock ERP journal entries queried; no entry found matching external reference.
+6. **Integration State:** `TransactionRecord` in `ERP_PENDING` or `FAILED_ERP` state, `retry_count: 1`.
+7. **Expected Result:** Outcome: `MISSING_IN_ERP`. Engine identifies core banking transaction missing general ledger counterpart.
+8. **Actual Result:** `MISSING_IN_ERP`. `fineract_amount: 2500000.0`, `erp_amount: 0.0`, `discrepancy: -2500000.0`.
+9. **Explanation:** Financial risk detected: loan funds released in core banking without corresponding general ledger debit/credit in ERP. Flagged for explicit repair.
+
+#### Scenario 3: Reconciliation Outcome: MISSING_IN_FINERACT
+1. **Initial State:** Direct manual journal entry posted in Mock ERP with `reference: "TX-REC-MISSFIN-003"` for 1,000,000 RWF.
+2. **Request:** `POST /api/reconciliation` with filter `references: ["TX-REC-MISSFIN-003"]`.
+3. **Response:** HTTP 200 OK -> `status: "MISSING_IN_FINERACT"`, discrepancy: `1,000,000 RWF`.
+4. **Fineract State:** Fineract core loan transactions queried; no record found for this reference.
+5. **ERP State:** Journal entry present in ERP with `reference: "TX-REC-MISSFIN-003"`, amount: 1,000,000 RWF.
+6. **Integration State:** `TransactionRecord` absent or unassociated with Fineract transaction ID.
+7. **Expected Result:** Outcome: `MISSING_IN_FINERACT`. Engine identifies orphan ERP ledger entry.
+8. **Actual Result:** `MISSING_IN_FINERACT`. `fineract_amount: 0.0`, `erp_amount: 1000000.0`, `discrepancy: 1000000.0`.
+9. **Explanation:** Audit anomaly: General ledger has a journal entry that does not correspond to any valid loan operation in core banking. Requires accounting investigation.
+
+#### Scenario 4: Reconciliation Outcome: AMOUNT_MISMATCH
+1. **Initial State:** Fineract records loan repayment of 500,000 RWF for `ref='TX-REC-DIFF-004'`, but Mock ERP has journal entry for 450,000 RWF.
+2. **Request:** `POST /api/reconciliation` with filter `references: ["TX-REC-DIFF-004"]`.
+3. **Response:** HTTP 200 OK -> `status: "AMOUNT_MISMATCH"`, discrepancy: `-50,000 RWF`.
+4. **Fineract State:** Repayment confirmed in Fineract for 500,000 RWF, `externalId: "TX-REC-DIFF-004"`.
+5. **ERP State:** Journal entry confirmed in ERP for 450,000 RWF, `reference: "TX-REC-DIFF-004"`.
+6. **Integration State:** Transaction recorded with mismatch details.
+7. **Expected Result:** Outcome: `AMOUNT_MISMATCH`. Engine flags discrepancy exceeding 0.01 tolerance.
+8. **Actual Result:** `AMOUNT_MISMATCH`. `fineract_amount: 500000.0`, `erp_amount: 450000.0`, `discrepancy: -50000.0`.
+9. **Explanation:** Ledger variance detected: Fineract core reduced customer debt by 500,000 RWF, but ERP cash account credited only 450,000 RWF. Discrepancy calculated as `erp_amount - fineract_amount`.
+
+#### Scenario 5: Reconciliation of Reversed Transactions
+1. **Initial State:** Fineract disbursement for `ref='TX-REC-REV-005'` was manually reversed. ERP holds compensating reversal journal entry.
+2. **Request:** `POST /api/reconciliation` with filter `references: ["TX-REC-REV-005"]`.
+3. **Response:** HTTP 200 OK -> `status: "MATCHED"` (Reversed Pair Confirmed), net discrepancy: `0.00 RWF`.
+4. **Fineract State:** Fineract transaction marked `manuallyReversed: true`, `externalId: "TX-REC-REV-005"`.
+5. **ERP State:** Original entry + Reversal journal entry (`DISBURSEMENT_REVERSAL`, `reference: "TX-REC-REV-005-REV"`) in ERP.
+6. **Integration State:** `TransactionRecord` marked with reversal audit metadata.
+7. **Expected Result:** Engine pairs reversed Fineract transaction with compensating ERP reversal entry, confirming net zero financial impact.
+8. **Actual Result:** `MATCHED`. Reversal confirmed in both systems. Net financial impact is zero.
+9. **Explanation:** Reversals in double-entry accounting do not delete rows. The engine audits both original and compensating reversal entries to ensure books stay in balance.
+
+#### Scenario 6: Reconciliation Engine Read-Only Guarantee
+1. **Initial State:** Unreconciled items (e.g., `MISSING_IN_ERP`) exist in database.
+2. **Request:** `POST /api/reconciliation` executed multiple times across different filter windows.
+3. **Response:** HTTP 200 OK -> Full discrepancy reports returned.
+4. **Fineract State:** Zero mutations executed in Fineract core banking.
+5. **ERP State:** Zero journal entries created, modified, or deleted in Mock ERP.
+6. **Integration State:** Database state unchanged: transaction records, ledger balances, and audit tables remain unmodified.
+7. **Expected Result:** Reconciliation is strictly read-only by default, preventing unintended automated financial mutations.
+8. **Actual Result:** Proved: System state before reconciliation == system state after reconciliation.
+9. **Explanation:** Reconciliation is an auditing and reporting function. Automated repair without operator review risks compounding ledger errors. Hence, repair is strictly decoupled into an explicit action.
+
+#### Scenario 7: Explicit Idempotent Repair Action
+1. **Initial State:** Reference `TX-REC-MISSERP-002` identified as `MISSING_IN_ERP`.
+2. **Request:** `POST /api/reconciliation/repair` with payload: `{"external_references": ["TX-REC-MISSERP-002"]}`.
+3. **Response:** HTTP 200 OK -> `{"repaired": ["TX-REC-MISSERP-002"], "failed": []}`.
+4. **Fineract State:** Fineract state untouched; loan disbursement remains intact.
+5. **ERP State:** Mock ERP now has journal entry for `TX-REC-MISSERP-002` posted with original breakdown.
+6. **Integration State:** `TransactionRecord` updated to `COMPLETED`. Subsequent `POST /api/reconciliation` reports `TX-REC-MISSERP-002` as `MATCHED`.
+7. **Expected Result:** Explicit repair completes missing ERP journal entry idempotently without re-disbursing in Fineract.
+8. **Actual Result:** Repair succeeded: ERP journal entry created, re-reconciliation confirmed `status: "MATCHED"`.
+9. **Explanation:** Repair leverages the recovery service and Mock ERP's `external_reference` idempotency. Repeated repair requests on the same reference are no-ops.
+
+

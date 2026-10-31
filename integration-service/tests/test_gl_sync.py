@@ -1,6 +1,7 @@
 """
 Unit and Integration Tests for GL Account Synchronization (Part A)
 """
+
 from unittest.mock import AsyncMock
 
 import pytest
@@ -131,7 +132,9 @@ async def test_gl_sync_sending_four_times_yields_one_mapping(db_session):
         assert resp.code == "1100"
 
     # 3. Database must contain exactly one mapping record
-    all_mappings = db_session.query(AccountSyncMapping).filter_by(external_reference="GL-1100").all()
+    all_mappings = (
+        db_session.query(AccountSyncMapping).filter_by(external_reference="GL-1100").all()
+    )
     assert len(all_mappings) == 1
     assert all_mappings[0].code == "1100"
     assert all_mappings[0].fineract_id == 55
@@ -218,6 +221,7 @@ def test_api_sync_endpoint_behavior():
     """
     Test the FastAPI REST endpoint POST /api/accounts/sync using TestClient
     """
+
     def override_get_db():
         db = TestingSessionLocal()
         try:
@@ -233,6 +237,7 @@ def test_api_sync_endpoint_behavior():
 
     with patch("app.api.accounts.gl_sync_service.sync_account") as mock_sync:
         from app.models.schemas import AccountSyncResponse
+
         mock_sync.return_value = AccountSyncResponse(
             external_reference="GL-1200",
             code="1200",

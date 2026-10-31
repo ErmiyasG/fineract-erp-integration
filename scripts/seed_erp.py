@@ -6,6 +6,7 @@ Accounts:
 - 1200: Loan Receivable (Asset)
 - 4000: Interest Income (Income)
 """
+
 import sys
 
 import httpx
@@ -48,7 +49,9 @@ def main() -> None:
             print("Mock ERP is healthy. Seeding Chart of Accounts...")
             for acc in ACCOUNTS:
                 resp = client.post("/api/accounts", json=acc)
-                print(f"Account {acc['code']} ({acc['name']}): status {resp.status_code}")
+                print(
+                    f"Account {acc['code']} ({acc['name']}): status {resp.status_code}"
+                )
     except (httpx.HTTPError, ValueError) as e:
         print(f"Failed to connect to Mock ERP: {e}")
         sys.exit(1)
@@ -56,4 +59,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -1,6 +1,7 @@
 """
 Pydantic schemas for Mock ERP API.
 """
+
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -45,7 +46,9 @@ class JournalEntryCreate(BaseModel):
     external_reference: str = Field(..., description="Unique operation identifier")
     description: str | None = Field(default=None)
     entry_date: str | None = Field(default=None)
-    lines: list[JournalEntryLineSchema] = Field(..., min_length=2, description="Debit and Credit lines")
+    lines: list[JournalEntryLineSchema] = Field(
+        ..., min_length=2, description="Debit and Credit lines"
+    )
 
 
 class JournalEntryResponse(BaseModel):

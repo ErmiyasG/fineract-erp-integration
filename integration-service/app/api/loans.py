@@ -3,6 +3,7 @@ Loans API Endpoints (Parts D, E, F, I, J)
 Manages Loan Application, Approval, Disbursement, and Repayment.
 Isolates Fineract internal IDs and enforces financial invariants across concurrency and failure.
 """
+
 import uuid
 from datetime import UTC, datetime
 
@@ -59,7 +60,10 @@ async def create_loan(
             detail={
                 "status": "IN_PROGRESS",
                 "message": str(exc),
-                "details": {"loan_reference": request.loan_reference, "external_reference": request.external_reference},
+                "details": {
+                    "loan_reference": request.loan_reference,
+                    "external_reference": request.external_reference,
+                },
                 "correlation_id": correlation_id,
                 "timestamp": datetime.now(UTC).isoformat(),
             },
@@ -71,7 +75,10 @@ async def create_loan(
                 "error": {
                     "code": "LOAN_CONFLICT",
                     "message": str(exc),
-                    "details": {"loan_reference": request.loan_reference, "external_reference": request.external_reference},
+                    "details": {
+                        "loan_reference": request.loan_reference,
+                        "external_reference": request.external_reference,
+                    },
                     "correlation_id": correlation_id,
                     "timestamp": datetime.now(UTC).isoformat(),
                 }
@@ -119,7 +126,9 @@ async def get_loan(
     """Retrieves loan status, terms, and live outstanding balance."""
     correlation_id = x_correlation_id or str(uuid.uuid4())
     try:
-        return await loan_service.get_loan_by_reference(db, loan_reference, correlation_id=correlation_id)
+        return await loan_service.get_loan_by_reference(
+            db, loan_reference, correlation_id=correlation_id
+        )
     except LoanNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -172,7 +181,10 @@ async def approve_loan(
     status_code=status.HTTP_200_OK,
     responses={
         202: {"description": "Disbursement currently in progress"},
-        409: {"model": ErrorResponse, "description": "Single-disbursement violation or payload conflict"},
+        409: {
+            "model": ErrorResponse,
+            "description": "Single-disbursement violation or payload conflict",
+        },
         404: {"model": ErrorResponse, "description": "Loan not found"},
     },
 )
@@ -206,7 +218,10 @@ async def disburse_loan(
             detail={
                 "status": "IN_PROGRESS",
                 "message": str(exc),
-                "details": {"loan_reference": loan_reference, "external_reference": request.external_reference},
+                "details": {
+                    "loan_reference": loan_reference,
+                    "external_reference": request.external_reference,
+                },
                 "correlation_id": correlation_id,
                 "timestamp": datetime.now(UTC).isoformat(),
             },
@@ -218,7 +233,10 @@ async def disburse_loan(
                 "error": {
                     "code": "DISBURSEMENT_CONFLICT",
                     "message": str(exc),
-                    "details": {"loan_reference": loan_reference, "external_reference": request.external_reference},
+                    "details": {
+                        "loan_reference": loan_reference,
+                        "external_reference": request.external_reference,
+                    },
                     "correlation_id": correlation_id,
                     "timestamp": datetime.now(UTC).isoformat(),
                 }
@@ -291,7 +309,10 @@ async def repay_loan(
             detail={
                 "status": "IN_PROGRESS",
                 "message": str(exc),
-                "details": {"loan_reference": loan_reference, "external_reference": request.external_reference},
+                "details": {
+                    "loan_reference": loan_reference,
+                    "external_reference": request.external_reference,
+                },
                 "correlation_id": correlation_id,
                 "timestamp": datetime.now(UTC).isoformat(),
             },
@@ -303,7 +324,10 @@ async def repay_loan(
                 "error": {
                     "code": "REPAYMENT_CONFLICT",
                     "message": str(exc),
-                    "details": {"loan_reference": loan_reference, "external_reference": request.external_reference},
+                    "details": {
+                        "loan_reference": loan_reference,
+                        "external_reference": request.external_reference,
+                    },
                     "correlation_id": correlation_id,
                     "timestamp": datetime.now(UTC).isoformat(),
                 }

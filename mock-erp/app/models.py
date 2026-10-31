@@ -1,6 +1,7 @@
 """
 SQLAlchemy models for Mock ERP: Accounts and Journal Entries.
 """
+
 from datetime import UTC, datetime
 
 from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text
@@ -31,14 +32,18 @@ class JournalEntry(Base):
     entry_date = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
 
-    lines = relationship("JournalEntryLine", back_populates="journal_entry", cascade="all, delete-orphan")
+    lines = relationship(
+        "JournalEntryLine", back_populates="journal_entry", cascade="all, delete-orphan"
+    )
 
 
 class JournalEntryLine(Base):
     __tablename__ = "journal_entry_lines"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    journal_entry_id = Column(Integer, ForeignKey("journal_entries.id", ondelete="CASCADE"), nullable=False)
+    journal_entry_id = Column(
+        Integer, ForeignKey("journal_entries.id", ondelete="CASCADE"), nullable=False
+    )
     account_code = Column(String(50), ForeignKey("accounts.code"), nullable=False)
     entry_type = Column(String(10), nullable=False)  # DEBIT or CREDIT
     amount = Column(Float, nullable=False)

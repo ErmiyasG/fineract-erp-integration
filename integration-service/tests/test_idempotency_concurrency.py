@@ -7,6 +7,7 @@ Validates:
 - I2: Concurrent disbursements (10 parallel calls, same & different references) -> exactly 1 disbursement
 - I3: Concurrent repayments (simultaneous repayments with distinct references) -> all apply once
 """
+
 import concurrent.futures
 from unittest.mock import AsyncMock
 
@@ -152,8 +153,11 @@ def test_i1_sequential_duplicates_disbursement_x4(test_client, mock_fineract, mo
     db = TestingSessionLocal()
     try:
         from app.models.db import DisbursementRecord, TransactionRecord
+
         assert db.query(IdempotencyRecord).filter_by(idempotency_key="TX-DISB-SEQ-001").count() == 1
-        assert db.query(TransactionRecord).filter_by(external_reference="TX-DISB-SEQ-001").count() == 1
+        assert (
+            db.query(TransactionRecord).filter_by(external_reference="TX-DISB-SEQ-001").count() == 1
+        )
         assert db.query(DisbursementRecord).filter_by(loan_reference=loan_ref).count() == 1
     finally:
         db.close()
@@ -167,7 +171,12 @@ def test_in_flight_duplicate_returns_202_accepted(test_client, mock_fineract):
     try:
         # Pre-seed an IN_PROGRESS idempotency record
         from app.services.idempotency import compute_payload_hash
-        payload = {"external_reference": "TX-INFLIGHT-001", "disbursement_date": "2026-01-02", "amount": 5000000.0}
+
+        payload = {
+            "external_reference": "TX-INFLIGHT-001",
+            "disbursement_date": "2026-01-02",
+            "amount": 5000000.0,
+        }
         in_flight_rec = IdempotencyRecord(
             idempotency_key="TX-INFLIGHT-001",
             operation_type="DISBURSEMENT",
@@ -186,7 +195,9 @@ def test_in_flight_duplicate_returns_202_accepted(test_client, mock_fineract):
     assert "currently in progress" in body["message"]
 
 
-def test_same_reference_different_payload_returns_409_conflict(test_client, mock_fineract, mock_erp):
+def test_same_reference_different_payload_returns_409_conflict(
+    test_client, mock_fineract, mock_erp
+):
     """
     Part F: Same reference, different payload -> 409 Conflict.
     """
@@ -205,16 +216,27 @@ def test_same_reference_different_payload_returns_409_conflict(test_client, mock
     # 1. Execute initial disbursement
     test_client.post(
         f"/api/loans/{loan_ref}/disburse",
-        json={"external_reference": "TX-REUSED-001", "disbursement_date": "2026-01-02", "amount": 5000000.0},
+        json={
+            "external_reference": "TX-REUSED-001",
+            "disbursement_date": "2026-01-02",
+            "amount": 5000000.0,
+        },
     )
 
     # 2. Resend same reference with DIFFERENT amount
     res_mismatch = test_client.post(
         f"/api/loans/{loan_ref}/disburse",
-        json={"external_reference": "TX-REUSED-001", "disbursement_date": "2026-01-02", "amount": 2500000.0},
+        json={
+            "external_reference": "TX-REUSED-001",
+            "disbursement_date": "2026-01-02",
+            "amount": 2500000.0,
+        },
     )
     assert res_mismatch.status_code == 409
-    assert "Conflict: Reference 'TX-REUSED-001' was already submitted with a different payload" in res_mismatch.json()["error"]["message"]
+    assert (
+        "Conflict: Reference 'TX-REUSED-001' was already submitted with a different payload"
+        in res_mismatch.json()["error"]["message"]
+    )
 
 
 def test_i2_concurrent_disbursements_same_reference(test_client, mock_fineract, mock_erp):
@@ -294,9 +316,13 @@ def test_i2_concurrent_disbursements_different_references(test_client, mock_fine
     conflict_count = statuses.count(409)
 
     # Exactly 1 request succeeds
-    assert success_count == 1, f"Expected exactly 1 success (200), got {success_count}. Statuses: {statuses}"
+    assert success_count == 1, (
+        f"Expected exactly 1 success (200), got {success_count}. Statuses: {statuses}"
+    )
     # Exactly 9 requests are rejected with 409 Conflict
-    assert conflict_count == 9, f"Expected 9 conflicts (409), got {conflict_count}. Statuses: {statuses}"
+    assert conflict_count == 9, (
+        f"Expected 9 conflicts (409), got {conflict_count}. Statuses: {statuses}"
+    )
 
     # Fineract core called exactly once
     assert mock_fineract.disburse_loan.await_count == 1
@@ -323,7 +349,11 @@ def test_i3_concurrent_repayments_different_references(test_client, mock_finerac
     )
     test_client.post(
         f"/api/loans/{loan_ref}/disburse",
-        json={"external_reference": "DISB-REPAY-PAR-001", "disbursement_date": "2026-01-02", "amount": 5000000.0},
+        json={
+            "external_reference": "DISB-REPAY-PAR-001",
+            "disbursement_date": "2026-01-02",
+            "amount": 5000000.0,
+        },
     )
 
     # 4 concurrent repayments of 500,000 RWF each
@@ -334,7 +364,7 @@ def test_i3_concurrent_repayments_different_references(test_client, mock_finerac
             f"/api/loans/{loan_ref}/repayments",
             json={
                 "external_reference": f"TX-REPAY-PAR-{idx}",
-                "transaction_date": f"2026-0{idx+2}-02",
+                "transaction_date": f"2026-0{idx + 2}-02",
                 "amount": amt,
             },
         )
@@ -355,7 +385,11 @@ def test_i3_concurrent_repayments_different_references(test_client, mock_finerac
     # Duplicates of one repayment reference apply once
     res_repay_dup = test_client.post(
         f"/api/loans/{loan_ref}/repayments",
-        json={"external_reference": "TX-REPAY-PAR-0", "transaction_date": "2026-02-02", "amount": 500000.0},
+        json={
+            "external_reference": "TX-REPAY-PAR-0",
+            "transaction_date": "2026-02-02",
+            "amount": 500000.0,
+        },
     )
     assert res_repay_dup.status_code == 200
     assert mock_fineract.repay_loan.await_count == 4  # Unchanged

@@ -8,6 +8,7 @@ Validates:
 5. 409 Conflict when client_uid is reused with different external_reference
 6. Correlation ID propagated in headers
 """
+
 from unittest.mock import AsyncMock
 
 import pytest
@@ -79,7 +80,9 @@ def test_create_client_and_get_by_uid(test_client, mock_fineract):
         "mobile_no": "+250788112233",
         "office_id": 1,
     }
-    res = test_client.post("/api/clients", json=create_payload, headers={"X-Correlation-ID": "test-corr-123"})
+    res = test_client.post(
+        "/api/clients", json=create_payload, headers={"X-Correlation-ID": "test-corr-123"}
+    )
     assert res.status_code == 201
     assert res.headers["X-Correlation-ID"] == "test-corr-123"
     data = res.json()

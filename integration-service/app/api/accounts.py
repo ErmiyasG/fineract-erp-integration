@@ -2,6 +2,7 @@
 Accounts API Endpoints
 Handles ERP Chart of Accounts synchronization into Fineract.
 """
+
 import uuid
 from datetime import UTC, datetime
 
@@ -20,7 +21,10 @@ router = APIRouter(prefix="/api/accounts", tags=["Chart of Accounts"])
     "/sync",
     response_model=AccountSyncResponse,
     responses={
-        409: {"model": ErrorResponse, "description": "Conflict: same reference with different attributes"},
+        409: {
+            "model": ErrorResponse,
+            "description": "Conflict: same reference with different attributes",
+        },
         422: {"model": ErrorResponse, "description": "Validation error or invalid account type"},
     },
 )
@@ -74,14 +78,18 @@ def get_synced_account(
     """
     Retrieves the synchronization status and details of an account.
     """
-    mapping = db.query(AccountSyncMapping).filter(
-        AccountSyncMapping.external_reference == external_reference
-    ).first()
+    mapping = (
+        db.query(AccountSyncMapping)
+        .filter(AccountSyncMapping.external_reference == external_reference)
+        .first()
+    )
 
     if not mapping:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"message": f"No account sync record found for reference '{external_reference}'"},
+            detail={
+                "message": f"No account sync record found for reference '{external_reference}'"
+            },
         )
 
     return AccountSyncResponse(

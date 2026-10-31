@@ -3,6 +3,7 @@ Clients API Endpoints (Part C & E)
 Manages client creation and query by business client_uid.
 Encapsulates and prevents leakage of Fineract internal IDs.
 """
+
 import uuid
 from datetime import UTC, datetime
 
@@ -54,7 +55,10 @@ async def create_client(
             detail={
                 "status": "IN_PROGRESS",
                 "message": str(exc),
-                "details": {"client_uid": request.client_uid, "external_reference": request.external_reference},
+                "details": {
+                    "client_uid": request.client_uid,
+                    "external_reference": request.external_reference,
+                },
                 "correlation_id": correlation_id,
                 "timestamp": datetime.now(UTC).isoformat(),
             },
@@ -66,7 +70,10 @@ async def create_client(
                 "error": {
                     "code": "CLIENT_CONFLICT",
                     "message": str(exc),
-                    "details": {"client_uid": request.client_uid, "external_reference": request.external_reference},
+                    "details": {
+                        "client_uid": request.client_uid,
+                        "external_reference": request.external_reference,
+                    },
                     "correlation_id": correlation_id,
                     "timestamp": datetime.now(UTC).isoformat(),
                 }
@@ -118,4 +125,3 @@ async def get_client(
                 }
             },
         )
-

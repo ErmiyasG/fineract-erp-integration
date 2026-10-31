@@ -6,6 +6,7 @@ Implements explicit state machine recovery for distributed financial transaction
 - Replays journal entries to Mock ERP using idempotent external_reference.
 - Sweeps pending/failed transactions on startup or on-demand via API.
 """
+
 import logging
 from datetime import UTC, datetime
 from typing import Any
@@ -24,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 
 class TransactionRecoveryService:
-
     def __init__(
         self,
         fineract_client: FineractClient | None = None,
@@ -65,9 +65,7 @@ class TransactionRecoveryService:
             }
 
         loan_map = (
-            db.query(LoanMapping)
-            .filter(LoanMapping.loan_reference == txn.loan_reference)
-            .first()
+            db.query(LoanMapping).filter(LoanMapping.loan_reference == txn.loan_reference).first()
         )
         if not loan_map:
             return {
@@ -160,13 +158,23 @@ class TransactionRecoveryService:
                     }
                     if txn.fineract_transaction_id:
                         fineract_details = await self.fineract_client.get_loan_transaction(
-                            loan_map.fineract_loan_id, txn.fineract_transaction_id, correlation_id=correlation_id
+                            loan_map.fineract_loan_id,
+                            txn.fineract_transaction_id,
+                            correlation_id=correlation_id,
                         )
                         if fineract_details:
-                            txn_breakdown["principal"] = float(fineract_details.get("principalPortion", 0.0))
-                            txn_breakdown["interest"] = float(fineract_details.get("interestPortion", 0.0))
-                            txn_breakdown["fee"] = float(fineract_details.get("feeChargesPortion", 0.0))
-                            txn_breakdown["penalty"] = float(fineract_details.get("penaltyChargesPortion", 0.0))
+                            txn_breakdown["principal"] = float(
+                                fineract_details.get("principalPortion", 0.0)
+                            )
+                            txn_breakdown["interest"] = float(
+                                fineract_details.get("interestPortion", 0.0)
+                            )
+                            txn_breakdown["fee"] = float(
+                                fineract_details.get("feeChargesPortion", 0.0)
+                            )
+                            txn_breakdown["penalty"] = float(
+                                fineract_details.get("penaltyChargesPortion", 0.0)
+                            )
 
                     journal_def = derive_journal_entries_from_breakdown(
                         operation_type="REPAYMENT",
@@ -239,7 +247,11 @@ class TransactionRecoveryService:
         """
         pending_txns = (
             db.query(TransactionRecord)
-            .filter(TransactionRecord.state.in_(["FINERACT_PENDING", "FINERACT_DONE", "ERP_PENDING", "NEEDS_RECONCILIATION"]))
+            .filter(
+                TransactionRecord.state.in_(
+                    ["FINERACT_PENDING", "FINERACT_DONE", "ERP_PENDING", "NEEDS_RECONCILIATION"]
+                )
+            )
             .all()
         )
         recovered = 0
@@ -248,7 +260,9 @@ class TransactionRecoveryService:
         results = []
 
         for txn in pending_txns:
-            res = await self.recover_transaction(db, txn.external_reference, correlation_id=correlation_id)
+            res = await self.recover_transaction(
+                db, txn.external_reference, correlation_id=correlation_id
+            )
             results.append(res)
             if res.get("status") in ("RECOVERED", "ALREADY_COMPLETED"):
                 recovered += 1

@@ -4,6 +4,7 @@ Maps ERP account types to Apache Fineract GL classifications.
 Derives double-entry balanced journal entries directly from Fineract transaction data breakdowns.
 Handles Disbursements, Repayments, Overpayments, Fees, Penalties, and Reversals.
 """
+
 from enum import Enum
 from typing import Any
 
@@ -122,7 +123,9 @@ def derive_journal_entries_from_breakdown(
         allocated = principal + interest + fee + penalty
         unallocated = float(total_amount) - allocated
         if unallocated > 0.0001:
-            credits.append({"account_code": overpayment_account_code, "amount": round(unallocated, 4)})
+            credits.append(
+                {"account_code": overpayment_account_code, "amount": round(unallocated, 4)}
+            )
 
     elif op == "REPAYMENT_REVERSAL":
         principal = float(breakdown.get("principal", 0.0))

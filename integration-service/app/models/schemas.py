@@ -1,6 +1,7 @@
 """
 Pydantic API Schemas and Contracts for Integration Service
 """
+
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -22,10 +23,14 @@ class ErrorResponse(BaseModel):
 # GL Account Sync Schemas (Part A)
 # -------------------------------------------------------------
 class AccountSyncRequest(BaseModel):
-    external_reference: str = Field(..., description="Unique ERP external identifier (e.g. GL-1200)")
+    external_reference: str = Field(
+        ..., description="Unique ERP external identifier (e.g. GL-1200)"
+    )
     code: str = Field(..., description="GL Account Code (e.g. 1200)")
     name: str = Field(..., description="GL Account Name (e.g. Loan Receivable)")
-    type: str = Field(..., description="ERP Account Type: ASSET, LIABILITY, EQUITY, INCOME, EXPENSE")
+    type: str = Field(
+        ..., description="ERP Account Type: ASSET, LIABILITY, EQUITY, INCOME, EXPENSE"
+    )
     currency: str = Field(default="RWF", description="Currency ISO code")
     description: str | None = Field(default="Synced from ERP", description="Account description")
 
@@ -135,6 +140,16 @@ class TransactionStatusResponse(BaseModel):
     retry_count: int
     created_at: str
     updated_at: str
+
+
+class ReconciliationFilterRequest(BaseModel):
+    start_date: str | None = None
+    end_date: str | None = None
+    references: list[str] | None = None
+
+
+class ReconciliationRepairRequest(BaseModel):
+    references: list[str]
 
 
 class ReconciliationItem(BaseModel):

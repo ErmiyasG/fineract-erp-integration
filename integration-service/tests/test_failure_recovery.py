@@ -7,6 +7,7 @@ Covers all 5 mandatory failure scenarios:
 4. ERP timeout after entry was written -> Idempotent retry returns existing entry, exactly 1 entry exists.
 5. Crash between Fineract success and ERP call -> Recovered on restart via startup/on-demand sweep.
 """
+
 from unittest.mock import AsyncMock
 
 import pytest
@@ -131,7 +132,11 @@ def test_scenario_1_erp_down_after_fineract_success(test_client, mock_fineract, 
     disb_ref = "TX-DISB-ERP-DOWN"
     res_disb = test_client.post(
         f"/api/loans/{loan_ref}/disburse",
-        json={"external_reference": disb_ref, "disbursement_date": "2026-01-02", "amount": 5000000.0},
+        json={
+            "external_reference": disb_ref,
+            "disbursement_date": "2026-01-02",
+            "amount": 5000000.0,
+        },
         headers={"X-Simulate-Failure": "erp_down_after_fineract"},
     )
     assert res_disb.status_code == 400
@@ -195,7 +200,11 @@ def test_scenario_2_fineract_down_safe_to_retry(test_client, mock_fineract, mock
     # Call with simulated Fineract outage
     res_fail = test_client.post(
         f"/api/loans/{loan_ref}/disburse",
-        json={"external_reference": disb_ref, "disbursement_date": "2026-01-02", "amount": 5000000.0},
+        json={
+            "external_reference": disb_ref,
+            "disbursement_date": "2026-01-02",
+            "amount": 5000000.0,
+        },
         headers={"X-Simulate-Failure": "fineract_down"},
     )
     assert res_fail.status_code == 400
@@ -213,7 +222,11 @@ def test_scenario_2_fineract_down_safe_to_retry(test_client, mock_fineract, mock
     # Retry Step: Caller retries identical request without simulated failure
     res_retry = test_client.post(
         f"/api/loans/{loan_ref}/disburse",
-        json={"external_reference": disb_ref, "disbursement_date": "2026-01-02", "amount": 5000000.0},
+        json={
+            "external_reference": disb_ref,
+            "disbursement_date": "2026-01-02",
+            "amount": 5000000.0,
+        },
     )
     assert res_retry.status_code == 200
     assert res_retry.json()["status"] == "COMPLETED"
@@ -241,7 +254,11 @@ def test_scenario_3_fineract_timeout_resolved_by_lookup(test_client, mock_finera
     disb_ref = "TX-TIMEOUT-001"
     res = test_client.post(
         f"/api/loans/{loan_ref}/disburse",
-        json={"external_reference": disb_ref, "disbursement_date": "2026-01-02", "amount": 5000000.0},
+        json={
+            "external_reference": disb_ref,
+            "disbursement_date": "2026-01-02",
+            "amount": 5000000.0,
+        },
         headers={"X-Simulate-Failure": "fineract_timeout"},
     )
     assert res.status_code == 200
@@ -275,7 +292,11 @@ def test_scenario_4_erp_timeout_idempotent_retry(test_client, mock_fineract, moc
     disb_ref = "TX-DISB-ERP-TIMEOUT"
     res = test_client.post(
         f"/api/loans/{loan_ref}/disburse",
-        json={"external_reference": disb_ref, "disbursement_date": "2026-01-02", "amount": 5000000.0},
+        json={
+            "external_reference": disb_ref,
+            "disbursement_date": "2026-01-02",
+            "amount": 5000000.0,
+        },
         headers={"X-Simulate-Failure": "erp_timeout"},
     )
     assert res.status_code == 400
@@ -310,7 +331,11 @@ def test_scenario_5_process_crash_and_restart_recovery(test_client, mock_finerac
     # Execute with simulated crash
     res = test_client.post(
         f"/api/loans/{loan_ref}/disburse",
-        json={"external_reference": disb_ref, "disbursement_date": "2026-01-02", "amount": 5000000.0},
+        json={
+            "external_reference": disb_ref,
+            "disbursement_date": "2026-01-02",
+            "amount": 5000000.0,
+        },
         headers={"X-Simulate-Failure": "process_crash"},
     )
     assert res.status_code == 400
@@ -338,4 +363,3 @@ def test_scenario_5_process_crash_and_restart_recovery(test_client, mock_finerac
         assert txn.state == "COMPLETED"
     finally:
         db.close()
-

@@ -15,6 +15,7 @@ Captures and records actual status, transaction breakdowns, and balances after e
 8. Actual Result
 9. Explanation
 """
+
 import base64
 import os
 import sys
@@ -25,11 +26,17 @@ import httpx
 
 INTEGRATION_URL = os.getenv("INTEGRATION_URL", "http://localhost:8000").rstrip("/")
 MOCK_ERP_URL = os.getenv("MOCK_ERP_URL", "http://localhost:8001").rstrip("/")
-FINERACT_URL = os.getenv("FINERACT_BASE_URL", "https://localhost:8443/fineract-provider/api/v1").rstrip("/")
+FINERACT_URL = os.getenv(
+    "FINERACT_BASE_URL", "https://localhost:8443/fineract-provider/api/v1"
+).rstrip("/")
 FINERACT_TENANT = os.getenv("FINERACT_TENANT_ID", "default")
 FINERACT_USER = os.getenv("FINERACT_AUTH_USER", "mifos")
 FINERACT_PASS = os.getenv("FINERACT_AUTH_PASSWORD", "password")
-INSECURE_SSL = os.getenv("FINERACT_INSECURE_SSL", "true").lower() in ("true", "1", "yes")
+INSECURE_SSL = os.getenv("FINERACT_INSECURE_SSL", "true").lower() in (
+    "true",
+    "1",
+    "yes",
+)
 
 EVIDENCE_FILE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -60,9 +67,9 @@ class SimulationClient:
         actual: str,
         explanation: str,
     ) -> None:
-        self.log(f"\n{'='*75}")
+        self.log(f"\n{'=' * 75}")
         self.log(f"STAGE: {step_name}")
-        self.log(f"{'='*75}")
+        self.log(f"{'=' * 75}")
         self.log(f"1. Initial State:    {initial_state}")
         self.log(f"2. Request:          {request_summary}")
         self.log(f"3. Response:         {response_summary}")
@@ -117,14 +124,24 @@ class SimulationClient:
 
 def run_simulation() -> None:
     client = SimulationClient()
-    client.log("===========================================================================")
+    client.log(
+        "==========================================================================="
+    )
     client.log(" Fintech Engineering Assessment: SIM-D Loan Lifecycle Simulation")
-    client.log(" End-to-End: Application -> Approval -> Disbursement -> 3 Repayments -> Payoff -> Closed")
-    client.log("===========================================================================")
+    client.log(
+        " End-to-End: Application -> Approval -> Disbursement -> 3 Repayments -> Payoff -> Closed"
+    )
+    client.log(
+        "==========================================================================="
+    )
 
     if not client.check_health():
-        client.log("Error: Target services (Integration Service, Mock ERP) are not reachable.")
-        client.log("Please ensure `docker compose up -d` is running before launching simulation.")
+        client.log(
+            "Error: Target services (Integration Service, Mock ERP) are not reachable."
+        )
+        client.log(
+            "Please ensure `docker compose up -d` is running before launching simulation."
+        )
         sys.exit(1)
 
     unique_suffix = str(uuid.uuid4())[:6].upper()
@@ -192,7 +209,9 @@ def run_simulation() -> None:
     # -------------------------------------------------------------------------
     # STAGE 3: Loan Approval
     # -------------------------------------------------------------------------
-    res_approve = client.http.post(f"{INTEGRATION_URL}/api/loans/{loan_reference}/approve")
+    res_approve = client.http.post(
+        f"{INTEGRATION_URL}/api/loans/{loan_reference}/approve"
+    )
     approve_data = res_approve.json()
 
     client.log_template(
@@ -217,7 +236,9 @@ def run_simulation() -> None:
         "disbursement_date": "2026-01-02",
         "amount": 5000000.0,
     }
-    res_disb = client.http.post(f"{INTEGRATION_URL}/api/loans/{loan_reference}/disburse", json=disb_req)
+    res_disb = client.http.post(
+        f"{INTEGRATION_URL}/api/loans/{loan_reference}/disburse", json=disb_req
+    )
     disb_data = res_disb.json()
 
     bal_1100_post_disb = client.get_erp_balance("1100")
@@ -251,7 +272,9 @@ def run_simulation() -> None:
             "transaction_date": r_date,
             "amount": amount,
         }
-        res_repay = client.http.post(f"{INTEGRATION_URL}/api/loans/{loan_reference}/repayments", json=repay_req)
+        res_repay = client.http.post(
+            f"{INTEGRATION_URL}/api/loans/{loan_reference}/repayments", json=repay_req
+        )
         repay_data = res_repay.json()
         breakdown = repay_data.get("breakdown", {})
         rem_balance = repay_data.get("remaining_balance", 0.0)
@@ -285,7 +308,9 @@ def run_simulation() -> None:
         "transaction_date": "2026-05-02",
         "amount": current_outstanding,
     }
-    res_final = client.http.post(f"{INTEGRATION_URL}/api/loans/{loan_reference}/repayments", json=final_req)
+    res_final = client.http.post(
+        f"{INTEGRATION_URL}/api/loans/{loan_reference}/repayments", json=final_req
+    )
     final_data = res_final.json()
 
     # Verify final loan state
@@ -312,9 +337,13 @@ def run_simulation() -> None:
     )
 
     client.save_evidence()
-    client.log("===========================================================================")
+    client.log(
+        "==========================================================================="
+    )
     client.log(" SIM-D Simulation Completed Successfully!")
-    client.log("===========================================================================")
+    client.log(
+        "==========================================================================="
+    )
 
 
 if __name__ == "__main__":

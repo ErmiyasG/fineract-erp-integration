@@ -1,13 +1,13 @@
 {
   "info": {
     "_postman_id": "71399f6b-028a-4c22-bca6-538d58548a31",
-    "name": "Fintech Assessment API Collection",
-    "description": "Postman collection covering Integration Service, Mock ERP, and Fineract operations",
+    "name": "Fineract ERP Integration API Collection",
+    "description": "Comprehensive Postman collection covering Integration Service, Mock ERP, and Core Banking operations.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "System Health",
+      "name": "1. System Health",
       "item": [
         {
           "name": "Integration Service Health",
@@ -34,6 +34,325 @@
           }
         }
       ]
+    },
+    {
+      "name": "2. GL Account Synchronization",
+      "item": [
+        {
+          "name": "Sync GL Account (Asset: 1200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference\": \"GL-1200\",\n  \"code\": \"1200\",\n  \"name\": \"Loan Portfolio Receivable\",\n  \"type\": \"ASSET\",\n  \"currency\": \"RWF\"\n}"
+            },
+            "url": {
+              "raw": "{{integration_url}}/api/accounts/sync",
+              "host": ["{{integration_url}}"],
+              "path": ["api", "accounts", "sync"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Clients Management",
+      "item": [
+        {
+          "name": "Create Client",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference\": \"REQ-CLI-001\",\n  \"client_uid\": \"SME-000001\",\n  \"first_name\": \"Jean\",\n  \"last_name\": \"Mugabo\",\n  \"office_id\": 1,\n  \"mobile_no\": \"+250780000001\"\n}"
+            },
+            "url": {
+              "raw": "{{integration_url}}/api/clients",
+              "host": ["{{integration_url}}"],
+              "path": ["api", "clients"]
+            }
+          }
+        },
+        {
+          "name": "Get Client by UID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{integration_url}}/api/clients/SME-000001",
+              "host": ["{{integration_url}}"],
+              "path": ["api", "clients", "SME-000001"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Loan Lifecycle",
+      "item": [
+        {
+          "name": "Submit Loan Application",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference\": \"REQ-LN-001\",\n  \"loan_reference\": \"LN-2026-000001\",\n  \"client_uid\": \"SME-000001\",\n  \"product_id\": 1,\n  \"principal\": 5000000,\n  \"term_months\": 12,\n  \"interest_rate\": 18.0\n}"
+            },
+            "url": {
+              "raw": "{{integration_url}}/api/loans",
+              "host": ["{{integration_url}}"],
+              "path": ["api", "loans"]
+            }
+          }
+        },
+        {
+          "name": "Get Loan Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{integration_url}}/api/loans/LN-2026-000001",
+              "host": ["{{integration_url}}"],
+              "path": ["api", "loans", "LN-2026-000001"]
+            }
+          }
+        },
+        {
+          "name": "Approve Loan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approval_date\": \"2026-10-28\",\n  \"note\": \"Approved for SME expansion\"\n}"
+            },
+            "url": {
+              "raw": "{{integration_url}}/api/loans/LN-2026-000001/approve",
+              "host": ["{{integration_url}}"],
+              "path": ["api", "loans", "LN-2026-000001", "approve"]
+            }
+          }
+        },
+        {
+          "name": "Disburse Loan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference\": \"TX-DISB-001\",\n  \"amount\": 5000000,\n  \"payment_type_id\": 1,\n  \"note\": \"Disbursement via bank transfer\"\n}"
+            },
+            "url": {
+              "raw": "{{integration_url}}/api/loans/LN-2026-000001/disburse",
+              "host": ["{{integration_url}}"],
+              "path": ["api", "loans", "LN-2026-000001", "disburse"]
+            }
+          }
+        },
+        {
+          "name": "Submit Repayment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference\": \"TX-REPAY-001\",\n  \"amount\": 450000,\n  \"payment_type_id\": 1,\n  \"note\": \"Month 1 installment\"\n}"
+            },
+            "url": {
+              "raw": "{{integration_url}}/api/loans/LN-2026-000001/repayments",
+              "host": ["{{integration_url}}"],
+              "path": ["api", "loans", "LN-2026-000001", "repayments"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Transactions & Failure Recovery",
+      "item": [
+        {
+          "name": "Get Transaction by External Reference",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{integration_url}}/api/transactions/TX-DISB-001",
+              "host": ["{{integration_url}}"],
+              "path": ["api", "transactions", "TX-DISB-001"]
+            }
+          }
+        },
+        {
+          "name": "Trigger Recovery Sweep",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{integration_url}}/api/transactions/recover",
+              "host": ["{{integration_url}}"],
+              "path": ["api", "transactions", "recover"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Two-Way Reconciliation",
+      "item": [
+        {
+          "name": "Run Reconciliation Report",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from_date\": \"2026-10-01\",\n  \"to_date\": \"2026-10-31\"\n}"
+            },
+            "url": {
+              "raw": "{{integration_url}}/api/reconciliation",
+              "host": ["{{integration_url}}"],
+              "path": ["api", "reconciliation"]
+            }
+          }
+        },
+        {
+          "name": "Repair Missing ERP Items",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_references\": [\n    \"TX-MISS-ERP-002\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{integration_url}}/api/reconciliation/repair",
+              "host": ["{{integration_url}}"],
+              "path": ["api", "reconciliation", "repair"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Mock ERP Direct Ledger",
+      "item": [
+        {
+          "name": "List Master Accounts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{mock_erp_url}}/api/accounts",
+              "host": ["{{mock_erp_url}}"],
+              "path": ["api", "accounts"]
+            }
+          }
+        },
+        {
+          "name": "Get Account Balance (1200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{mock_erp_url}}/api/accounts/1200/balance",
+              "host": ["{{mock_erp_url}}"],
+              "path": ["api", "accounts", "1200", "balance"]
+            }
+          }
+        },
+        {
+          "name": "Get Journal Entry by Reference",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{mock_erp_url}}/api/journal-entries/TX-DISB-001",
+              "host": ["{{mock_erp_url}}"],
+              "path": ["api", "journal-entries", "TX-DISB-001"]
+            }
+          }
+        }
+      ]
     }
   ],
   "variable": [
@@ -47,4 +366,3 @@
     }
   ]
 }
-

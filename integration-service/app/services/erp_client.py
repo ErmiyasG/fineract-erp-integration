@@ -2,6 +2,7 @@
 Mock ERP Client for Integration Service
 Posts journal entries and retrieves accounting master data.
 """
+
 from typing import Any
 
 import httpx
@@ -10,7 +11,9 @@ from app.config import settings
 
 
 class ErpClientException(Exception):
-    def __init__(self, message: str, status_code: int | None = None, details: dict[str, Any] | None = None):
+    def __init__(
+        self, message: str, status_code: int | None = None, details: dict[str, Any] | None = None
+    ):
         super().__init__(message)
         self.status_code = status_code
         self.details = details or {}
@@ -71,7 +74,9 @@ class ErpClient:
         except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
             raise ErpConnectionException(f"Failed to connect to ERP: {exc}") from exc
 
-    async def get_journal_entry(self, external_reference: str, correlation_id: str | None = None) -> dict[str, Any] | None:
+    async def get_journal_entry(
+        self, external_reference: str, correlation_id: str | None = None
+    ) -> dict[str, Any] | None:
         url = f"{self.base_url}/api/journal-entries/{external_reference}"
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -85,7 +90,9 @@ class ErpClient:
         except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
             raise ErpConnectionException(f"Failed to connect to ERP: {exc}") from exc
 
-    async def get_account_balance(self, code: str, correlation_id: str | None = None) -> dict[str, Any] | None:
+    async def get_account_balance(
+        self, code: str, correlation_id: str | None = None
+    ) -> dict[str, Any] | None:
         url = f"{self.base_url}/api/accounts/{code}/balance"
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:

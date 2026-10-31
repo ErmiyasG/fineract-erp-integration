@@ -1,6 +1,7 @@
 """
 Tests for Mock ERP API: Accounts, Balances, Journal Entries, Idempotency, and Balancing rules.
 """
+
 import os
 
 import pytest
@@ -110,11 +111,23 @@ def test_journal_entry_balancing_rule():
     # Setup accounts
     client.post(
         "/api/accounts",
-        json={"code": "1100", "name": "Bank", "type": "ASSET", "currency": "RWF", "external_reference": "GL-1100"},
+        json={
+            "code": "1100",
+            "name": "Bank",
+            "type": "ASSET",
+            "currency": "RWF",
+            "external_reference": "GL-1100",
+        },
     )
     client.post(
         "/api/accounts",
-        json={"code": "1200", "name": "Loans", "type": "ASSET", "currency": "RWF", "external_reference": "GL-1200"},
+        json={
+            "code": "1200",
+            "name": "Loans",
+            "type": "ASSET",
+            "currency": "RWF",
+            "external_reference": "GL-1200",
+        },
     )
 
     # Unbalanced entry: Debits (100) != Credits (90)
@@ -134,7 +147,13 @@ def test_journal_entry_balancing_rule():
 def test_journal_entry_unknown_account():
     client.post(
         "/api/accounts",
-        json={"code": "1100", "name": "Bank", "type": "ASSET", "currency": "RWF", "external_reference": "GL-1100"},
+        json={
+            "code": "1100",
+            "name": "Bank",
+            "type": "ASSET",
+            "currency": "RWF",
+            "external_reference": "GL-1100",
+        },
     )
     payload = {
         "external_reference": "TX-UNKNOWN",
@@ -151,9 +170,27 @@ def test_journal_entry_unknown_account():
 def test_journal_entry_idempotency_and_balances():
     # Setup accounts
     for acc in [
-        {"code": "1100", "name": "Bank", "type": "ASSET", "currency": "RWF", "external_reference": "GL-1100"},
-        {"code": "1200", "name": "Receivable", "type": "ASSET", "currency": "RWF", "external_reference": "GL-1200"},
-        {"code": "4000", "name": "Interest", "type": "INCOME", "currency": "RWF", "external_reference": "GL-4000"},
+        {
+            "code": "1100",
+            "name": "Bank",
+            "type": "ASSET",
+            "currency": "RWF",
+            "external_reference": "GL-1100",
+        },
+        {
+            "code": "1200",
+            "name": "Receivable",
+            "type": "ASSET",
+            "currency": "RWF",
+            "external_reference": "GL-1200",
+        },
+        {
+            "code": "4000",
+            "name": "Interest",
+            "type": "INCOME",
+            "currency": "RWF",
+            "external_reference": "GL-4000",
+        },
     ]:
         client.post("/api/accounts", json=acc)
 

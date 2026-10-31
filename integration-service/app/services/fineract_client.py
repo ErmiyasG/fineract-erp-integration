@@ -3,6 +3,7 @@ Apache Fineract REST API Client
 Provides HTTP communication with Fineract Core Banking.
 Encapsulates authentication, tenant identification, timeouts, and lookup before retry.
 """
+
 import base64
 from typing import Any
 
@@ -12,7 +13,9 @@ from app.config import settings
 
 
 class FineractClientException(Exception):
-    def __init__(self, message: str, status_code: int | None = None, details: dict[str, Any] | None = None):
+    def __init__(
+        self, message: str, status_code: int | None = None, details: dict[str, Any] | None = None
+    ):
         super().__init__(message)
         self.status_code = status_code
         self.details = details or {}
@@ -27,7 +30,6 @@ class FineractConnectionException(FineractClientException):
 
 
 class FineractClient:
-
     def __init__(
         self,
         base_url: str | None = None,
@@ -54,11 +56,17 @@ class FineractClient:
             headers["X-Correlation-ID"] = correlation_id
         return headers
 
-    async def _post(self, path: str, payload: dict[str, Any], correlation_id: str | None = None) -> dict[str, Any]:
+    async def _post(
+        self, path: str, payload: dict[str, Any], correlation_id: str | None = None
+    ) -> dict[str, Any]:
         url = f"{self.base_url}/{path.lstrip('/')}"
         try:
-            async with httpx.AsyncClient(verify=not settings.FINERACT_INSECURE_SSL, timeout=self.timeout) as client:
-                res = await client.post(url, json=payload, headers=self._get_headers(correlation_id))
+            async with httpx.AsyncClient(
+                verify=not settings.FINERACT_INSECURE_SSL, timeout=self.timeout
+            ) as client:
+                res = await client.post(
+                    url, json=payload, headers=self._get_headers(correlation_id)
+                )
                 if res.status_code in (200, 201):
                     return res.json()
                 elif res.status_code == 409:
@@ -74,12 +82,16 @@ class FineractClient:
                         details={"response": res.text, "path": path},
                     )
         except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
-            raise FineractConnectionException(f"Fineract connection error at {path}: {exc}") from exc
+            raise FineractConnectionException(
+                f"Fineract connection error at {path}: {exc}"
+            ) from exc
 
     async def _get(self, path: str, correlation_id: str | None = None) -> dict[str, Any] | None:
         url = f"{self.base_url}/{path.lstrip('/')}"
         try:
-            async with httpx.AsyncClient(verify=not settings.FINERACT_INSECURE_SSL, timeout=self.timeout) as client:
+            async with httpx.AsyncClient(
+                verify=not settings.FINERACT_INSECURE_SSL, timeout=self.timeout
+            ) as client:
                 res = await client.get(url, headers=self._get_headers(correlation_id))
                 if res.status_code == 200:
                     return res.json()
@@ -92,7 +104,9 @@ class FineractClient:
                         details={"response": res.text, "path": path},
                     )
         except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
-            raise FineractConnectionException(f"Fineract connection error at {path}: {exc}") from exc
+            raise FineractConnectionException(
+                f"Fineract connection error at {path}: {exc}"
+            ) from exc
 
     # -------------------------------------------------------------------------
     # GL Account Methods
@@ -120,7 +134,9 @@ class FineractClient:
         }
         return await self._post("glaccounts", payload, correlation_id)
 
-    async def get_gl_account_by_id(self, account_id: int, correlation_id: str | None = None) -> dict[str, Any] | None:
+    async def get_gl_account_by_id(
+        self, account_id: int, correlation_id: str | None = None
+    ) -> dict[str, Any] | None:
         return await self._get(f"glaccounts/{account_id}", correlation_id)
 
     # -------------------------------------------------------------------------
@@ -148,7 +164,9 @@ class FineractClient:
         }
         return await self._post("clients", payload, correlation_id)
 
-    async def get_client_by_external_id(self, client_uid: str, correlation_id: str | None = None) -> dict[str, Any] | None:
+    async def get_client_by_external_id(
+        self, client_uid: str, correlation_id: str | None = None
+    ) -> dict[str, Any] | None:
         """Looks up client by externalId (client_uid) in Fineract."""
         data = await self._get(f"clients?externalId={client_uid}", correlation_id)
         if data and isinstance(data, dict):
@@ -157,7 +175,9 @@ class FineractClient:
                 return page_items[0]
         return None
 
-    async def get_client_by_id(self, client_id: int, correlation_id: str | None = None) -> dict[str, Any] | None:
+    async def get_client_by_id(
+        self, client_id: int, correlation_id: str | None = None
+    ) -> dict[str, Any] | None:
         return await self._get(f"clients/{client_id}", correlation_id)
 
     # -------------------------------------------------------------------------
@@ -248,11 +268,15 @@ class FineractClient:
         }
         return await self._post(f"loans/{loan_id}?command=repayment", payload, correlation_id)
 
-    async def get_loan_by_id(self, loan_id: int, correlation_id: str | None = None) -> dict[str, Any] | None:
+    async def get_loan_by_id(
+        self, loan_id: int, correlation_id: str | None = None
+    ) -> dict[str, Any] | None:
         """Fetches loan details including current status and outstanding balance."""
         return await self._get(f"loans/{loan_id}?associations=all", correlation_id)
 
-    async def get_loan_by_external_id(self, loan_reference: str, correlation_id: str | None = None) -> dict[str, Any] | None:
+    async def get_loan_by_external_id(
+        self, loan_reference: str, correlation_id: str | None = None
+    ) -> dict[str, Any] | None:
         """Looks up loan by externalId (loan_reference) in Fineract."""
         data = await self._get(f"loans/external-id/{loan_reference}", correlation_id)
         return data
@@ -282,4 +306,3 @@ class FineractClient:
 
 
 fineract_client = FineractClient()
-

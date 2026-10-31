@@ -7,6 +7,7 @@ Rules:
 3. Same reference, same payload, in progress -> Returns 202 Accepted
 4. Same reference, different payload -> Raises IdempotencyConflictError (409 Conflict)
 """
+
 import hashlib
 import json
 from datetime import UTC, datetime
@@ -32,7 +33,6 @@ def compute_payload_hash(payload: dict[str, Any] | list[Any]) -> str:
 
 
 class IdempotencyService:
-
     @staticmethod
     def check_and_acquire(
         db: Session,

@@ -9,6 +9,7 @@ Automates configuration of a fresh Fineract instance:
 4. Configure Loan Product: 'SME Asset Finance' (18% annual, 12 months, cash-based accounting)
 5. Provision Least-Privilege API Role and User
 """
+
 import base64
 import os
 import sys
@@ -17,18 +18,30 @@ from typing import Any
 
 import httpx
 
-FINERACT_BASE_URL = os.getenv("FINERACT_BASE_URL", "https://localhost:8443/fineract-provider/api/v1").rstrip("/")
+FINERACT_BASE_URL = os.getenv(
+    "FINERACT_BASE_URL", "https://localhost:8443/fineract-provider/api/v1"
+).rstrip("/")
 TENANT_ID = os.getenv("FINERACT_TENANT_ID", "default")
 ADMIN_USER = os.getenv("FINERACT_ADMIN_USER", "mifos")
 ADMIN_PASSWORD = os.getenv("FINERACT_ADMIN_PASSWORD", "password")
-INSECURE_SSL = os.getenv("FINERACT_INSECURE_SSL", "true").lower() in ("true", "1", "yes")
+INSECURE_SSL = os.getenv("FINERACT_INSECURE_SSL", "true").lower() in (
+    "true",
+    "1",
+    "yes",
+)
 
 API_USER_NAME = os.getenv("FINERACT_API_USER", "fintech_api_user")
 API_USER_PASS = os.getenv("FINERACT_API_PASSWORD", "ApiUserSecurePassword123!")
 
 
 class FineractAdminClient:
-    def __init__(self, base_url: str = FINERACT_BASE_URL, tenant_id: str = TENANT_ID, user: str = ADMIN_USER, password: str = ADMIN_PASSWORD):
+    def __init__(
+        self,
+        base_url: str = FINERACT_BASE_URL,
+        tenant_id: str = TENANT_ID,
+        user: str = ADMIN_USER,
+        password: str = ADMIN_PASSWORD,
+    ):
         self.base_url = base_url
         self.tenant_id = tenant_id
         self.user = user
@@ -57,7 +70,9 @@ class FineractAdminClient:
         return self.client.put(url, json=json, headers=self._headers())
 
 
-def wait_for_fineract(client: FineractAdminClient, max_retries: int = 30, delay: int = 3) -> bool:
+def wait_for_fineract(
+    client: FineractAdminClient, max_retries: int = 30, delay: int = 3
+) -> bool:
     print(f"Checking Fineract availability at {client.base_url}...")
     for attempt in range(1, max_retries + 1):
         try:
@@ -66,7 +81,9 @@ def wait_for_fineract(client: FineractAdminClient, max_retries: int = 30, delay:
                 print("Connected to Apache Fineract.")
                 return True
         except (httpx.HTTPError, ConnectionError, OSError) as e:
-            print(f"Waiting for Fineract to become ready (attempt {attempt}/{max_retries}): {e}")
+            print(
+                f"Waiting for Fineract to become ready (attempt {attempt}/{max_retries}): {e}"
+            )
         time.sleep(delay)
     return False
 
@@ -87,7 +104,9 @@ def configure_currency(client: FineractAdminClient) -> None:
     if put_res.status_code in (200, 201):
         print("  Successfully configured 'RWF' currency.")
     else:
-        print(f"  Warning: Currencies PUT returned {put_res.status_code}: {put_res.text}")
+        print(
+            f"  Warning: Currencies PUT returned {put_res.status_code}: {put_res.text}"
+        )
 
 
 def configure_office(client: FineractAdminClient) -> int:
@@ -146,7 +165,9 @@ def configure_gl_accounts(client: FineractAdminClient) -> dict[str, int]:
     for code, (name, acc_type, ext_ref) in gl_accounts_to_seed.items():
         if code in existing_by_code:
             account_ids[code] = existing_by_code[code]
-            print(f"  GL Account {code} ('{name}') exists (ID: {existing_by_code[code]}).")
+            print(
+                f"  GL Account {code} ('{name}') exists (ID: {existing_by_code[code]})."
+            )
             continue
 
         payload = {
@@ -165,7 +186,9 @@ def configure_gl_accounts(client: FineractAdminClient) -> dict[str, int]:
             account_ids[code] = acc_id
             print(f"  Created GL Account {code} ('{name}') (ID: {acc_id}).")
         else:
-            print(f"  Error creating GL {code}: {res_create.status_code} {res_create.text}")
+            print(
+                f"  Error creating GL {code}: {res_create.status_code} {res_create.text}"
+            )
 
     return account_ids
 
@@ -232,12 +255,16 @@ def configure_loan_product(client: FineractAdminClient, gl_map: dict[str, int]) 
         print(f"  Created Loan Product 'SME Asset Finance' (ID: {prod_id}).")
         return prod_id
     else:
-        print(f"  Failed to create loan product: {create_res.status_code} {create_res.text}")
+        print(
+            f"  Failed to create loan product: {create_res.status_code} {create_res.text}"
+        )
         return 1
 
 
 def configure_least_privilege_user(client: FineractAdminClient, office_id: int) -> None:
-    print(f"Step 5: Provisioning Least-Privilege API Role and User '{API_USER_NAME}'...")
+    print(
+        f"Step 5: Provisioning Least-Privilege API Role and User '{API_USER_NAME}'..."
+    )
     role_name = "FintechIntegrationRole"
     role_id = None
 
@@ -251,7 +278,13 @@ def configure_least_privilege_user(client: FineractAdminClient, office_id: int) 
                 break
 
     if not role_id:
-        res_create_role = client.post("/roles", json={"name": role_name, "description": "Least-privilege role for ERP integration"})
+        res_create_role = client.post(
+            "/roles",
+            json={
+                "name": role_name,
+                "description": "Least-privilege role for ERP integration",
+            },
+        )
         if res_create_role.status_code in (200, 201):
             role_id = res_create_role.json().get("resourceId")
             print(f"  Created Role '{role_name}' (ID: {role_id}).")

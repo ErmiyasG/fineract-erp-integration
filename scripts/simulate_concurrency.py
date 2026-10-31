@@ -7,6 +7,7 @@ SIM-I2 & SIM-I3: Concurrency Simulations (Parts I2 & I3)
 - SIM-I3: Concurrent repayments on the same loan with different references.
 Adheres to the 9-point Evidence Template.
 """
+
 import os
 import uuid
 
@@ -43,9 +44,9 @@ class ConcurrencySimulation:
         actual: str,
         explanation: str,
     ) -> None:
-        self.log(f"\n{'='*75}")
+        self.log(f"\n{'=' * 75}")
         self.log(f"SCENARIO: {step_name}")
-        self.log(f"{'='*75}")
+        self.log(f"{'=' * 75}")
         self.log(f"1. Initial State:    {initial_state}")
         self.log(f"2. Request:          {request_summary}")
         self.log(f"3. Response:         {response_summary}")
@@ -67,7 +68,9 @@ def run() -> None:
     sim = ConcurrencySimulation()
     sim.log("==================================================================")
     sim.log(" SIM-I2 & SIM-I3: Concurrency & Invariant Enforcement Simulations")
-    sim.log(" Multi-Layer Defense: Idempotency -> DB Constraint -> Fineract State Machine")
+    sim.log(
+        " Multi-Layer Defense: Idempotency -> DB Constraint -> Fineract State Machine"
+    )
     sim.log("==================================================================")
 
     unique_id = str(uuid.uuid4())[:6].upper()

@@ -9,6 +9,7 @@ Covers all 5 mandatory failure scenarios:
 5. Crash between Fineract success and ERP call -> Recovered on restart via startup/on-demand sweep.
 Adheres to the 9-point Evidence Template.
 """
+
 import os
 import uuid
 
@@ -46,9 +47,9 @@ class FailureSimulation:
         actual: str,
         explanation: str,
     ) -> None:
-        self.log(f"\n{'='*75}")
+        self.log(f"\n{'=' * 75}")
         self.log(f"SCENARIO {scenario_num}: {title}")
-        self.log(f"{'='*75}")
+        self.log(f"{'=' * 75}")
         self.log(f"1. Initial State:    {initial_state}")
         self.log(f"2. Request:          {request_summary}")
         self.log(f"3. Response:         {response_summary}")
@@ -70,7 +71,9 @@ def run() -> None:
     sim = FailureSimulation()
     sim.log("==================================================================")
     sim.log(" SIM-J: Distributed Transaction Failure Handling & Recovery (Part J)")
-    sim.log(" Explicit State Machine: RECEIVED -> FINERACT_PENDING -> FINERACT_DONE -> ERP_PENDING -> COMPLETED")
+    sim.log(
+        " Explicit State Machine: RECEIVED -> FINERACT_PENDING -> FINERACT_DONE -> ERP_PENDING -> COMPLETED"
+    )
     sim.log("==================================================================")
 
     uid = str(uuid.uuid4())[:6].upper()

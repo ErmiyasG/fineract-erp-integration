@@ -1,6 +1,7 @@
 """
 Unit and Integration Tests for Loan Lifecycle, Idempotency, Single-Disbursement Invariant, and Repayments
 """
+
 from unittest.mock import AsyncMock
 
 import pytest
@@ -167,7 +168,10 @@ def test_single_disbursement_invariant(test_client, mock_fineract, mock_erp):
     }
     res_diff = test_client.post("/api/loans/LN-2026-000002/disburse", json=diff_payload)
     assert res_diff.status_code == 409
-    assert "Single-disbursement invariant prohibits multiple disbursements" in res_diff.json()["error"]["message"]
+    assert (
+        "Single-disbursement invariant prohibits multiple disbursements"
+        in res_diff.json()["error"]["message"]
+    )
     assert mock_fineract.disburse_loan.await_count == 1
 
 
@@ -185,7 +189,11 @@ def test_repayment_derives_journal_and_posts(test_client, mock_fineract, mock_er
     )
     test_client.post(
         "/api/loans/LN-2026-000003/disburse",
-        json={"external_reference": "DISB-003", "disbursement_date": "2026-01-02", "amount": 5000000.0},
+        json={
+            "external_reference": "DISB-003",
+            "disbursement_date": "2026-01-02",
+            "amount": 5000000.0,
+        },
     )
 
     # Post repayment

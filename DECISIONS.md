@@ -44,9 +44,18 @@ This document records the architectural rationale, trade-offs, and failure recov
 * **Decision:** Partner contracts strictly use business identifiers (`client_uid`, `loan_reference`, and `external_reference`).
 * **Rationale:** Exposing database primary keys (`clientId: 12`, `loanId: 45`) couples external partners to the internal storage engine, breaches multi-tenant isolation, and leaks data volume information. Local mapping tables (`client_mappings`, `loan_mappings`) map business keys to Fineract's `externalId` and internal IDs transparently.
 
-### 1.7 What Was Deliberately Not Built & Known Weaknesses
-* **Not Built:** Distributed two-phase commit (XA transactions), multi-currency FX conversion, multi-tranche loan schedules.
-* **Known Weakness:** If Mock ERP is partitioned for hours while Fineract succeeds, transactions remain in `NEEDS_RECONCILIATION` until the ERP recovery sweeper runs or manual reconciliation is triggered.
+### 1.7 What Was Deliberately Not Built, Known Weaknesses & Future Architecture (Part L)
+* **What Was Deliberately Not Built:**
+  - *Distributed Two-Phase Commit (XA transactions):* Fragile, blocking coordinator protocols that reduce system availability.
+  - *Message Broker / Heavy Queue Infrastructure:* Unnecessary operational complexity for this integration tier; synchronous ingress backed by persisted PostgreSQL state machine and startup/periodic sweeper meets all consistency guarantees with lower failure surface.
+* **Known Weaknesses:**
+  - If Mock ERP experiences an extended outage (e.g. 12+ hours) while Fineract continues to process disbursements, records accumulate in `ERP_PENDING` / `FAILED_ERP` until the sweeper runs or manual reconciliation repair is invoked.
+  - Batching: Currently, journal entries are posted one-by-one; in hyper-scale workloads (>1,000 tx/sec), bulk posting APIs would be required.
+* **Tier 3 / Future Extensions (Part L):**
+  1. *Transactional Outbox with Change Data Capture (CDC):* Implement the Transactional Outbox pattern using PostgreSQL WAL logs and Debezium/Kafka to stream ledger events asynchronously to ERP without two-phase commit.
+  2. *Multi-Currency & FX Gain/Loss:* Support disbursements in local currencies (e.g., KES, UGX, RWF) funded by hard-currency credit facilities (USD, EUR), tracking realized and unrealized FX variance in dedicated general ledger accounts.
+  3. *Multi-Tranche Loan Milestone Disbursements:* Extend single-disbursement invariant to support approved multi-tranche schedules with conditional collateral and milestone verification before tranche release.
+  4. *OpenTelemetry Distributed Tracing:* Upgrade correlation ID headers to standard W3C `traceparent` headers with Span exports to Jaeger/Tempo.
 
 ### 1.8 Source of Truth for Financial Breakdown: Fineract Core vs. Integration Service
 * **Options Evaluated:**
@@ -83,6 +92,19 @@ This document records the architectural rationale, trade-offs, and failure recov
      * In Apache Fineract core, a loan exists in status `APPROVED (200)`. Upon successful disbursement, Fineract executes an atomic database transaction changing the status to `ACTIVE (300)` and recording the disbursement transaction.
      * Any subsequent call to `/loans/{loanId}?command=disburse` encounters Fineract's domain state check: `if (!loan.isApproved()) throw LoanCannotBeDisbursedException(...)`.
      * **Conclusion:** The Fineract core loan state machine is the **last line of defence** guaranteeing that no financial loan product can ever be disbursed more than once under any race condition, network anomaly, or architectural failure.
+
+### 1.11 Two-Way Reconciliation Design: Read-Only Invariant & Explicit Repair (Part K)
+* **Options Evaluated:**
+  1. *Automatic background self-healing reconciliation:* The reconciliation job automatically repairs any missing ERP journal entries on discovery.
+  2. *Strict read-only reconciliation with decoupled explicit repair:* Reconciliation only queries and reports discrepancies without mutating either system. Repair is executed via an explicit operator API call.
+* **Decision:** Strict Read-Only Reconciliation with Decoupled Explicit Repair (`POST /api/reconciliation/repair`).
+* **Rationale:**
+  - Automated ledger mutation during reporting introduces profound financial audit risks: if a transaction is missing in ERP due to an upstream data corruption, configuration error, or fraudulent tampering, automatically forcing an entry into ERP compounds the error and obscures the root cause.
+  - Making reconciliation read-only by default ensures idempotence of the reporting endpoint—auditors and monitoring systems can run reconciliation continuously or across overlapping date windows with zero side effects.
+  - When an operator verifies a legitimate discrepancy (such as transient network failure resulting in `MISSING_IN_ERP`), they trigger `POST /api/reconciliation/repair`. This invokes the recovery engine which leverages ERP's own `external_reference` uniqueness to post missing entries idempotently without re-disbursing or mutating Fineract core.
+* **Tolerance & Discrepancy Calculation:**
+  - Discrepancy is calculated as $\Delta = \text{Amount}_{\text{ERP}} - \text{Amount}_{\text{Fineract}}$.
+  - A tolerance of 0.01 RWF is applied to prevent floating-point variances from generating false positives.
 
 ---
 

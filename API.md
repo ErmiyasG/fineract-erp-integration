@@ -196,15 +196,22 @@ Every state-changing endpoint requires an `external_reference` in the payload or
 
 ---
 
-### 3.7 Reconciliation
+### 3.7 Reconciliation (Part K)
+
+#### 3.7.1 Execute Reconciliation Report (Read-Only)
 * **`POST /api/reconciliation`**
+* **Headers:** `X-Correlation-ID: <uuid>`
+* **Description:** Performs a read-only two-way comparison between Fineract loan transactions and Mock ERP journal entries. Zero state modifications.
 * **Request:**
 ```json
 {
   "from_date": "2026-10-01",
-  "to_date": "2026-10-31"
+  "to_date": "2026-10-31",
+  "references": ["TX-DISB-001", "TX-REPAY-002"]
 }
 ```
+*Note: All filter fields (`from_date`, `to_date`, `references`) are optional.*
+
 * **Response (`200 OK`):**
 ```json
 {
@@ -219,32 +226,58 @@ Every state-changing endpoint requires an `external_reference` in the payload or
     {
       "external_reference": "TX-MATCHED-001",
       "status": "MATCHED",
-      "fineract_amount": 5000000,
-      "erp_amount": 5000000,
-      "details": "Both systems match exactly"
+      "fineract_amount": 5000000.0,
+      "erp_amount": 5000000.0,
+      "discrepancy": 0.0,
+      "details": "Confirmed in both systems with matching amounts."
     },
     {
       "external_reference": "TX-MISS-ERP-002",
       "status": "MISSING_IN_ERP",
-      "fineract_amount": 450000,
-      "erp_amount": null,
-      "details": "Fineract transaction exists without ERP journal entry"
+      "fineract_amount": 2500000.0,
+      "erp_amount": 0.0,
+      "discrepancy": -2500000.0,
+      "details": "Present in Fineract core but absent in Mock ERP ledger."
     },
     {
       "external_reference": "TX-MISS-FIN-003",
       "status": "MISSING_IN_FINERACT",
-      "fineract_amount": null,
-      "erp_amount": 450000,
-      "details": "ERP journal entry exists without Fineract transaction"
+      "fineract_amount": 0.0,
+      "erp_amount": 1000000.0,
+      "discrepancy": 1000000.0,
+      "details": "Present in Mock ERP ledger but absent in Fineract core."
     },
     {
       "external_reference": "TX-MISMATCH-004",
       "status": "AMOUNT_MISMATCH",
-      "fineract_amount": 450000,
-      "erp_amount": 400000,
-      "details": "Amounts differ by 50000"
+      "fineract_amount": 500000.0,
+      "erp_amount": 450000.0,
+      "discrepancy": -50000.0,
+      "details": "Present in both systems but amounts differ beyond 0.01 tolerance."
     }
   ]
+}
+```
+
+#### 3.7.2 Explicit Idempotent Repair
+* **`POST /api/reconciliation/repair`**
+* **Headers:** `X-Correlation-ID: <uuid>`
+* **Description:** Explicit operator action to resolve `MISSING_IN_ERP` items. Dispatches unposted transactions to ERP idempotently without re-disbursing in Fineract.
+* **Request:**
+```json
+{
+  "external_references": [
+    "TX-MISS-ERP-002"
+  ]
+}
+```
+* **Response (`200 OK`):**
+```json
+{
+  "repaired": [
+    "TX-MISS-ERP-002"
+  ],
+  "failed": []
 }
 ```
 

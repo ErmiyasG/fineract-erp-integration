@@ -23,7 +23,6 @@ class GLSyncConflictError(Exception):
 
 
 class GLSyncService:
-
     def __init__(self, fineract_client: FineractClient | None = None):
         self.fineract_client = fineract_client or default_fineract_client
 
@@ -48,13 +47,19 @@ class GLSyncService:
         fineract_type_int = map_erp_type_to_fineract(request.type)
 
         # Check existing mapping
-        mapping = db.query(AccountSyncMapping).filter(
-            AccountSyncMapping.external_reference == request.external_reference
-        ).first()
+        mapping = (
+            db.query(AccountSyncMapping)
+            .filter(AccountSyncMapping.external_reference == request.external_reference)
+            .first()
+        )
 
         if mapping:
             # Check for conflict if attributes changed
-            if mapping.code != request.code or mapping.name != request.name or mapping.account_type != request.type:
+            if (
+                mapping.code != request.code
+                or mapping.name != request.name
+                or mapping.account_type != request.type
+            ):
                 raise GLSyncConflictError(
                     f"Conflict for GL reference '{request.external_reference}': "
                     f"existing code='{mapping.code}', name='{mapping.name}', type='{mapping.account_type}'; "
@@ -106,7 +111,9 @@ class GLSyncService:
             )
 
             # Extract resource ID from Fineract response (resourceId or subResourceId)
-            fineract_gl_id = fineract_response.get("resourceId") or fineract_response.get("subResourceId")
+            fineract_gl_id = fineract_response.get("resourceId") or fineract_response.get(
+                "subResourceId"
+            )
 
             mapping.fineract_id = fineract_gl_id
             mapping.sync_status = "SYNCED"
