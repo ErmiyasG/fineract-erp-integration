@@ -1,6 +1,11 @@
 .PHONY: help build up down restart logs test test-java test-python lint format typecheck init-fineract seed-erp demo-gl-sync simulate-lifecycle simulate-duplicates simulate-concurrency simulate-failures simulate-reconciliation clean
 
 SHELL := /bin/bash
+VENV ?= $(PWD)/venv
+PYTHON := $(shell if [ -x $(VENV)/bin/python3 ]; then echo $(VENV)/bin/python3; else which python3; fi)
+PYTEST := $(shell if [ -x $(VENV)/bin/pytest ]; then echo $(VENV)/bin/pytest; else which pytest; fi)
+RUFF := $(shell if [ -x $(VENV)/bin/ruff ]; then echo $(VENV)/bin/ruff; else which ruff; fi)
+MYPY := $(shell if [ -x $(VENV)/bin/mypy ]; then echo $(VENV)/bin/mypy; else which mypy; fi)
 
 help: ## Display available commands
 	@echo "=================================================================="
@@ -34,46 +39,44 @@ test-java: ## Run JUnit tests for the Fineract Java customization
 
 test-python: ## Run pytest across Python components
 	@echo "Running Integration Service and Mock ERP tests..."
-	cd integration-service && pytest -v
-	cd mock-erp && pytest -v
+	cd integration-service && $(PYTEST) -v
+	cd mock-erp && $(PYTEST) -v
 
 test: test-java test-python ## Run all tests across both languages
 
 lint: ## Lint Python services using ruff
-	cd integration-service && ruff check .
-	cd mock-erp && ruff check .
+	$(RUFF) check .
 
 format: ## Format Python code
-	cd integration-service && ruff format .
-	cd mock-erp && ruff format .
+	$(RUFF) format .
 
 typecheck: ## Run mypy type checking
-	cd integration-service && mypy app
-	cd mock-erp && mypy app
+	cd integration-service && $(MYPY) app
+	cd mock-erp && $(MYPY) app
 
 init-fineract: ## Run automated configuration for Fineract (office, currency, product, user)
-	python3 scripts/init_fineract.py
+	$(PYTHON) scripts/init_fineract.py
 
 seed-erp: ## Seed chart of accounts into Mock ERP
-	python3 scripts/seed_erp.py
+	$(PYTHON) scripts/seed_erp.py
 
 demo-gl-sync: ## Run Part A GL account sync demonstration (Behaviors 1-4)
-	python3 scripts/demo_gl_sync.py
+	$(PYTHON) scripts/demo_gl_sync.py
 
 simulate-lifecycle: ## Run end-to-end loan lifecycle simulation (Part D)
-	python3 scripts/simulate_lifecycle.py
+	$(PYTHON) scripts/simulate_lifecycle.py
 
 simulate-duplicates: ## Run sequential duplicate disbursement simulation (Part I1)
-	python3 scripts/simulate_duplicates.py
+	$(PYTHON) scripts/simulate_duplicates.py
 
 simulate-concurrency: ## Run concurrent disbursements and repayments simulation (Part I2, I3)
-	python3 scripts/simulate_concurrency.py
+	$(PYTHON) scripts/simulate_concurrency.py
 
 simulate-failures: ## Run failure injection and recovery scenarios (Part J)
-	python3 scripts/simulate_failures.py
+	$(PYTHON) scripts/simulate_failures.py
 
 simulate-reconciliation: ## Run reconciliation simulation showing all 4 outcomes (Part K)
-	python3 scripts/simulate_reconciliation.py
+	$(PYTHON) scripts/simulate_reconciliation.py
 
 clean: ## Stop containers and remove volumes
 	docker compose down -v
