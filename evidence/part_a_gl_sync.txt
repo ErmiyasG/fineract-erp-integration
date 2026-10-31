@@ -5,27 +5,27 @@
 Verifying behaviors 1-4 implemented in Fineract core via patch & Liquibase:
 Connected to live Fineract container. Running live assertions...
 
---> Behavior 1: Create GL Account with new external_reference='GL-4434F765'
-    [Response] HTTP 200: {"resourceId":8}
+--> Behavior 1: Create GL Account with new external_reference='GL-ABA1CE19'
+    [Response] HTTP 200: {"resourceId":9}
 
---> Behavior 2: Repeated creation with identical reference='GL-4434F765'
-    [Response] HTTP 200: {"resourceId":8}
+--> Behavior 2: Repeated creation with identical reference='GL-ABA1CE19'
+    [Response] HTTP 200: {"resourceId":9}
 
---> Behavior 3: Conflict creation with same reference='GL-4434F765' but conflicting payload
+--> Behavior 3: Conflict creation with same reference='GL-ABA1CE19' but conflicting payload
     [Response] HTTP 409: {
   "developerMessage" : "Request was understood but caused a domain rule violation.",
   "httpStatusCode" : "403",
   "defaultUserMessage" : "Errors contain reason for domain rule violation.",
   "userMessageGlobalisationCode" : "validation.msg.domain.rule.violation",
   "errors" : [ {
-    "developerMessage" : "A GL Account with external reference GL-4434F765 already exists with conflicting attributes (existing glCode: 12A51B, incoming glCode: 99999)",
-    "defaultUserMessage" : "A GL Account with external reference GL-4434F765 already exists with conflicting attributes (existing glCode: 12A51B, incoming glCode: 99999)",
+    "developerMessage" : "A GL Account with external reference GL-ABA1CE19 already exists with conflicting attributes (existing glCode: 122033, incoming glCode: 99999)",
+    "defaultUserMessage" : "A GL Account with external reference GL-ABA1CE19 already exists with conflicting attributes (existing glCode: 122033, incoming glCode: 99999)",
     "userMessageGlobalisationCode" : "error.msg.glaccount.external.reference.conflict",
     "parameterName" : "id",
     "args" : [ {
-      "value" : "GL-4434F765"
+      "value" : "GL-ABA1CE19"
     }, {
-      "value" : "12A51B"
+      "value" : "122033"
     }, {
       "value" : "99999"
     } ]
@@ -34,7 +34,7 @@ Connected to live Fineract container. Running live assertions...
 
 --> Behavior 4: Request with invalid/missing permissions (Least Privilege Guard)
     [Response] HTTP 401: {
-  "timestamp" : "2026-10-31T12:10:57.271Z",
+  "timestamp" : "2026-10-31T16:15:35.067Z",
   "status" : 401,
   "error" : "Unauthorized",
   "path" : "/fineract-provider/api/v1/glaccounts"

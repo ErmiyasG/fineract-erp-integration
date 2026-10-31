@@ -6,8 +6,8 @@
 ===========================================================================
 SCENARIO 1: ERP Down After Fineract Success
 ===========================================================================
-1. Initial State:    Loan 'LN-FAIL-1-B87FA8' approved. Mock ERP becomes unreachable after Fineract disburses.
-2. Request:          POST /api/loans/LN-FAIL-1-B87FA8/disburse (amount=5,000,000 RWF, ref='TX-SCEN-1-B87FA8'). Injected failure: erp_down_after_fineract.
+1. Initial State:    Loan 'LN-FAIL-1-F94427' approved. Mock ERP becomes unreachable after Fineract disburses.
+2. Request:          POST /api/loans/LN-FAIL-1-F94427/disburse (amount=5,000,000 RWF, ref='TX-SCEN-1-F94427'). Injected failure: erp_down_after_fineract.
 3. Response:         Caller receives HTTP 400/502 with error 'ERP unreachable'. Status reflects pending recovery.
 4. Fineract State:   Loan successfully disbursed in Fineract. Fineract transaction ID recorded. Outstanding: 5,000,000 RWF.
 5. ERP State:        Zero journal entries created in ERP during failure.
@@ -19,8 +19,8 @@ SCENARIO 1: ERP Down After Fineract Success
 ===========================================================================
 SCENARIO 2: Fineract Down at Request Ingress
 ===========================================================================
-1. Initial State:    Loan 'LN-FAIL-2-B87FA8' submitted. Fineract core banking engine is completely down.
-2. Request:          POST /api/loans/LN-FAIL-2-B87FA8/disburse (ref='TX-SCEN-2-B87FA8'). Injected failure: fineract_down.
+1. Initial State:    Loan 'LN-FAIL-2-F94427' submitted. Fineract core banking engine is completely down.
+2. Request:          POST /api/loans/LN-FAIL-2-F94427/disburse (ref='TX-SCEN-2-F94427'). Injected failure: fineract_down.
 3. Response:         Caller receives HTTP 400/503 'Fineract core is unreachable'.
 4. Fineract State:   Fineract unreachable; no mutation attempted or recorded.
 5. ERP State:        No mutation in ERP.
@@ -32,8 +32,8 @@ SCENARIO 2: Fineract Down at Request Ingress
 ===========================================================================
 SCENARIO 3: Fineract Timeout After Sending (Resolved by externalId Lookup)
 ===========================================================================
-1. Initial State:    Loan 'LN-FAIL-3-B87FA8' approved. HTTP socket times out after request sent to Fineract.
-2. Request:          POST /api/loans/LN-FAIL-3-B87FA8/disburse (ref='TX-SCEN-3-B87FA8'). Injected failure: fineract_timeout.
+1. Initial State:    Loan 'LN-FAIL-3-F94427' approved. HTTP socket times out after request sent to Fineract.
+2. Request:          POST /api/loans/LN-FAIL-3-F94427/disburse (ref='TX-SCEN-3-F94427'). Injected failure: fineract_timeout.
 3. Response:         Caller receives HTTP 200 OK (Timeout resolved transparently by lookup).
 4. Fineract State:   Transaction exists in Fineract with externalId='TX-SCEN-3-{uid}'.
 5. ERP State:        ERP journal entry created (DR 1200 / CR 1100).
@@ -45,8 +45,8 @@ SCENARIO 3: Fineract Timeout After Sending (Resolved by externalId Lookup)
 ===========================================================================
 SCENARIO 4: ERP Timeout After Entry Was Written
 ===========================================================================
-1. Initial State:    Loan 'LN-FAIL-4-B87FA8' disbursed in Fineract. ERP writes journal entry but connection drops before response returned.
-2. Request:          POST /api/loans/LN-FAIL-4-B87FA8/disburse (ref='TX-SCEN-4-B87FA8'). Injected failure: erp_timeout.
+1. Initial State:    Loan 'LN-FAIL-4-F94427' disbursed in Fineract. ERP writes journal entry but connection drops before response returned.
+2. Request:          POST /api/loans/LN-FAIL-4-F94427/disburse (ref='TX-SCEN-4-F94427'). Injected failure: erp_timeout.
 3. Response:         Initial call fails with timeout. On recovery sweep / retry: returns HTTP 200 OK.
 4. Fineract State:   Fineract loan active with 1 disbursement transaction.
 5. ERP State:        Exactly 1 journal entry exists in Mock ERP. Secondary call returned existing entry.
@@ -58,8 +58,8 @@ SCENARIO 4: ERP Timeout After Entry Was Written
 ===========================================================================
 SCENARIO 5: Crash Between Fineract Success and ERP Call (Startup Recovery)
 ===========================================================================
-1. Initial State:    Loan 'LN-FAIL-5-B87FA8' disbursed. Process dies before ERP HTTP request initiated.
-2. Request:          POST /api/loans/LN-FAIL-5-B87FA8/disburse (ref='TX-SCEN-5-B87FA8'). Injected failure: process_crash.
+1. Initial State:    Loan 'LN-FAIL-5-F94427' disbursed. Process dies before ERP HTTP request initiated.
+2. Request:          POST /api/loans/LN-FAIL-5-F94427/disburse (ref='TX-SCEN-5-F94427'). Injected failure: process_crash.
 3. Response:         Initial process killed. On application restart, startup recovery sweep completes transaction.
 4. Fineract State:   Fineract transaction ID persisted in PostgreSQL before crash.
 5. ERP State:        Journal entry posted during startup recovery sweep.

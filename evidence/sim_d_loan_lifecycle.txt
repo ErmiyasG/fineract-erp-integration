@@ -6,12 +6,12 @@
 ===========================================================================
 STAGE: 1. Client Creation
 ===========================================================================
-1. Initial State:    Client 'SME-AF57A3' does not exist. ERP Balances: 1100=0.0, 1200=0.0.
-2. Request:          POST /api/clients (client_uid='SME-AF57A3', external_ref='REF-CLI-AF57A3')
-3. Response:         HTTP 201 - client_uid='SME-AF57A3', status='ACTIVE'
-4. Fineract State:   Client created with externalId='SME-AF57A3' (Fineract internal numeric ID isolated).
+1. Initial State:    Client 'SME-3846FA' does not exist. ERP Balances: 1100=500799.0, 1200=0.0.
+2. Request:          POST /api/clients (client_uid='SME-3846FA', external_ref='REF-CLI-3846FA')
+3. Response:         HTTP 201 - client_uid='SME-3846FA', status='ACTIVE'
+4. Fineract State:   Client created with externalId='SME-3846FA' (Fineract internal numeric ID isolated).
 5. ERP State:        No accounting mutation.
-6. Integration State:client_mappings record active for SME-AF57A3.
+6. Integration State:client_mappings record active for SME-3846FA.
 7. Expected Result:  HTTP 201 Created with client business identity.
 8. Actual Result:    HTTP 201 - active status verified.
 9. Explanation:      Client mapped to Fineract externalId without exposing internal database IDs.
@@ -19,10 +19,10 @@ STAGE: 1. Client Creation
 ===========================================================================
 STAGE: 2. Loan Application Submission
 ===========================================================================
-1. Initial State:    Client 'SME-AF57A3' active with no active loans.
-2. Request:          POST /api/loans (loan_reference='LN-2026-AF57A3', principal=5,000,000 RWF, 18% annual, 12 mo)
+1. Initial State:    Client 'SME-3846FA' active with no active loans.
+2. Request:          POST /api/loans (loan_reference='LN-2026-3846FA', principal=5,000,000 RWF, 18% annual, 12 mo)
 3. Response:         HTTP 201 - status='SUBMITTED_AND_PENDING_APPROVAL'
-4. Fineract State:   Loan submitted with externalId='LN-2026-AF57A3', state='SUBMITTED_AND_PENDING_APPROVAL'.
+4. Fineract State:   Loan submitted with externalId='LN-2026-3846FA', state='SUBMITTED_AND_PENDING_APPROVAL'.
 5. ERP State:        No accounting mutation.
 6. Integration State:loan_mappings record created with status='SUBMITTED_AND_PENDING_APPROVAL'.
 7. Expected Result:  HTTP 201 Created with SUBMITTED_AND_PENDING_APPROVAL status.
@@ -32,9 +32,9 @@ STAGE: 2. Loan Application Submission
 ===========================================================================
 STAGE: 3. Loan Approval
 ===========================================================================
-1. Initial State:    Loan 'LN-2026-AF57A3' in SUBMITTED_AND_PENDING_APPROVAL state.
-2. Request:          POST /api/loans/LN-2026-AF57A3/approve
-3. Response:         HTTP 200 - status='APPROVED', approved_at='2026-10-31T12:17:34.127804+00:00'
+1. Initial State:    Loan 'LN-2026-3846FA' in SUBMITTED_AND_PENDING_APPROVAL state.
+2. Request:          POST /api/loans/LN-2026-3846FA/approve
+3. Response:         HTTP 200 - status='APPROVED', approved_at='2026-10-31T16:15:44.991747+00:00'
 4. Fineract State:   Loan state advanced to APPROVED (awaiting disbursement).
 5. ERP State:        No accounting mutation.
 6. Integration State:loan_mappings record updated to status='APPROVED'.
@@ -45,12 +45,12 @@ STAGE: 3. Loan Approval
 ===========================================================================
 STAGE: 4. Loan Disbursement
 ===========================================================================
-1. Initial State:    Loan 'LN-2026-AF57A3' in APPROVED state.
-2. Request:          POST /api/loans/LN-2026-AF57A3/disburse (amount=5,000,000 RWF, ref='DISB-AF57A3')
+1. Initial State:    Loan 'LN-2026-3846FA' in APPROVED state.
+2. Request:          POST /api/loans/LN-2026-3846FA/disburse (amount=5,000,000 RWF, ref='DISB-3846FA')
 3. Response:         HTTP 200 - status='COMPLETED', disbursed_amount=5000000.0
 4. Fineract State:   Loan state advanced to ACTIVE. Total outstanding: 5,000,000 RWF.
-5. ERP State:        DR 1200 Loan Receivable (+5,000,000 RWF, bal=5000000.0) / CR 1100 Bank (-5,000,000 RWF, bal=-5000000.0).
-6. Integration State:loan_mappings.disbursed=1. TransactionRecord 'DISB-AF57A3' COMPLETED.
+5. ERP State:        DR 1200 Loan Receivable (+5,000,000 RWF, bal=5000000.0) / CR 1100 Bank (-5,000,000 RWF, bal=-4499201.0).
+6. Integration State:loan_mappings.disbursed=1. TransactionRecord 'DISB-3846FA' COMPLETED.
 7. Expected Result:  HTTP 200 OK. Fineract loan active, ERP journal entry posted.
 8. Actual Result:    HTTP 200 - 5,000,000 RWF disbursed and posted.
 9. Explanation:      Single disbursement executed. Balance matches initial principal.
@@ -59,11 +59,11 @@ STAGE: 4. Loan Disbursement
 STAGE: 5. Partial Repayment #1
 ===========================================================================
 1. Initial State:    Loan active, prior balance pending partial amortization.
-2. Request:          POST /api/loans/LN-2026-AF57A3/repayments (amount=500000.0 RWF, ref='REPAY-1-AF57A3')
+2. Request:          POST /api/loans/LN-2026-3846FA/repayments (amount=500000.0 RWF, ref='REPAY-1-3846FA')
 3. Response:         HTTP 200 - breakdown: principal=383400.0, interest=116600.0, remaining=5000799.0
 4. Fineract State:   Fineract processed repayment. Real-time outstanding balance=5000799.0 RWF.
-5. ERP State:        DR 1100 (+500000.0, bal=-4500000.0) / CR 1200 (-383400.0, bal=4616600.0) / CR 4000 (+116600.0, bal=116600.0).
-6. Integration State:TransactionRecord 'REPAY-1-AF57A3' COMPLETED.
+5. ERP State:        DR 1100 (+500000.0, bal=-3999201.0) / CR 1200 (-383400.0, bal=4616600.0) / CR 4000 (+116600.0, bal=617399.0).
+6. Integration State:TransactionRecord 'REPAY-1-3846FA' COMPLETED.
 7. Expected Result:  HTTP 200 OK. Real transaction breakdown derived and posted to ERP.
 8. Actual Result:    HTTP 200 - principal/interest derived directly from Fineract.
 9. Explanation:      Accounting entry derives principal/interest split directly from Fineract transaction breakdown.
@@ -72,11 +72,11 @@ STAGE: 5. Partial Repayment #1
 STAGE: 6. Partial Repayment #2
 ===========================================================================
 1. Initial State:    Loan active, prior balance pending partial amortization.
-2. Request:          POST /api/loans/LN-2026-AF57A3/repayments (amount=500000.0 RWF, ref='REPAY-2-AF57A3')
+2. Request:          POST /api/loans/LN-2026-3846FA/repayments (amount=500000.0 RWF, ref='REPAY-2-3846FA')
 3. Response:         HTTP 200 - breakdown: principal=408939.0, interest=91061.0, remaining=4500799.0
 4. Fineract State:   Fineract processed repayment. Real-time outstanding balance=4500799.0 RWF.
-5. ERP State:        DR 1100 (+500000.0, bal=-4000000.0) / CR 1200 (-408939.0, bal=4207661.0) / CR 4000 (+91061.0, bal=207661.0).
-6. Integration State:TransactionRecord 'REPAY-2-AF57A3' COMPLETED.
+5. ERP State:        DR 1100 (+500000.0, bal=-3499201.0) / CR 1200 (-408939.0, bal=4207661.0) / CR 4000 (+91061.0, bal=708460.0).
+6. Integration State:TransactionRecord 'REPAY-2-3846FA' COMPLETED.
 7. Expected Result:  HTTP 200 OK. Real transaction breakdown derived and posted to ERP.
 8. Actual Result:    HTTP 200 - principal/interest derived directly from Fineract.
 9. Explanation:      Accounting entry derives principal/interest split directly from Fineract transaction breakdown.
@@ -85,11 +85,11 @@ STAGE: 6. Partial Repayment #2
 STAGE: 7. Partial Repayment #3
 ===========================================================================
 1. Initial State:    Loan active, prior balance pending partial amortization.
-2. Request:          POST /api/loans/LN-2026-AF57A3/repayments (amount=500000.0 RWF, ref='REPAY-3-AF57A3')
+2. Request:          POST /api/loans/LN-2026-3846FA/repayments (amount=500000.0 RWF, ref='REPAY-3-3846FA')
 3. Response:         HTTP 200 - breakdown: principal=442513.0, interest=57487.0, remaining=4000799.0
 4. Fineract State:   Fineract processed repayment. Real-time outstanding balance=4000799.0 RWF.
-5. ERP State:        DR 1100 (+500000.0, bal=-3500000.0) / CR 1200 (-442513.0, bal=3765148.0) / CR 4000 (+57487.0, bal=265148.0).
-6. Integration State:TransactionRecord 'REPAY-3-AF57A3' COMPLETED.
+5. ERP State:        DR 1100 (+500000.0, bal=-2999201.0) / CR 1200 (-442513.0, bal=3765148.0) / CR 4000 (+57487.0, bal=765947.0).
+6. Integration State:TransactionRecord 'REPAY-3-3846FA' COMPLETED.
 7. Expected Result:  HTTP 200 OK. Real transaction breakdown derived and posted to ERP.
 8. Actual Result:    HTTP 200 - principal/interest derived directly from Fineract.
 9. Explanation:      Accounting entry derives principal/interest split directly from Fineract transaction breakdown.
@@ -98,11 +98,11 @@ STAGE: 7. Partial Repayment #3
 STAGE: 8. Final Payoff & Obligation Met
 ===========================================================================
 1. Initial State:    Outstanding balance before payoff: 4000799.0 RWF.
-2. Request:          POST /api/loans/LN-2026-AF57A3/repayments (amount=4000799.0 RWF, ref='FINAL-PAYOFF-AF57A3')
+2. Request:          POST /api/loans/LN-2026-3846FA/repayments (amount=4000799.0 RWF, ref='FINAL-PAYOFF-3846FA')
 3. Response:         HTTP 200 - remaining_balance=0.0
 4. Fineract State:   Loan state: Closed (obligations met). Outstanding balance: 0.0 RWF.
-5. ERP State:        Bank 1100 bal=500799.0. Loan Receivable 1200 cleared to 0.0 RWF. Total Interest Income 4000 earned: 500799.0 RWF.
-6. Integration State:Loan 'LN-2026-AF57A3' status updated to Closed (obligations met).
+5. ERP State:        Bank 1100 bal=1001598.0. Loan Receivable 1200 cleared to 0.0 RWF. Total Interest Income 4000 earned: 1001598.0 RWF.
+6. Integration State:Loan 'LN-2026-3846FA' status updated to Closed (obligations met).
 7. Expected Result:  HTTP 200 OK. Loan transitions to Closed (obligations met) with 0.00 RWF outstanding.
 8. Actual Result:    Status: Closed (obligations met), Outstanding Balance: 0.0 RWF.
 9. Explanation:      Final payment cleared entire loan balance. Core banking engine closed loan with obligations met.

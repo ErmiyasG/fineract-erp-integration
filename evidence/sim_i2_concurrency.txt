@@ -6,12 +6,12 @@
 ===========================================================================
 SCENARIO: SIM-I2.A: 10 Parallel Disbursements (IDENTICAL Reference)
 ===========================================================================
-1. Initial State:    Loan 'LN-CONC-SAME-5B08EF' approved, undisbursed.
-2. Request:          10 simultaneous parallel threads firing POST /api/loans/LN-CONC-SAME-5B08EF/disburse with the identical external_reference 'TX-PAR-SAME-5B08EF'.
+1. Initial State:    Loan 'LN-CONC-SAME-9F959F' approved, undisbursed.
+2. Request:          10 simultaneous parallel threads firing POST /api/loans/LN-CONC-SAME-9F959F/disburse with the identical external_reference 'TX-PAR-SAME-9F959F'.
 3. Response:         Exactly 1 thread executed the disbursement (HTTP 200). The other concurrent threads received HTTP 202 (in progress) or HTTP 200 (cached completed result).
 4. Fineract State:   Exactly 1 disbursement transaction recorded. Loan status: ACTIVE.
 5. ERP State:        Exactly 1 journal entry created (DR 1200 / CR 1100).
-6. Integration State:Exactly 1 transaction_records entry with external_reference='TX-PAR-SAME-5B08EF'.
+6. Integration State:Exactly 1 transaction_records entry with external_reference='TX-PAR-SAME-9F959F'.
 7. Expected Result:  Exactly 1 disbursement across both core banking and ERP.
 8. Actual Result:    Exactly 1 disbursement confirmed in both Fineract and ERP.
 9. Explanation:      Tier-1 Ingress Idempotency filter locks the external reference upon first thread arrival. Concurrent threads attempting execution of the same reference receive 202 In Progress and never start a second execution.
@@ -19,8 +19,8 @@ SCENARIO: SIM-I2.A: 10 Parallel Disbursements (IDENTICAL Reference)
 ===========================================================================
 SCENARIO: SIM-I2.B: 10 Parallel Disbursements (DIFFERENT References)
 ===========================================================================
-1. Initial State:    Loan 'LN-CONC-DIFF-5B08EF' approved, undisbursed.
-2. Request:          10 simultaneous parallel threads firing POST /api/loans/LN-CONC-DIFF-5B08EF/disburse with 10 DIFFERENT references ('TX-DIFF-1' through 'TX-DIFF-10').
+1. Initial State:    Loan 'LN-CONC-DIFF-9F959F' approved, undisbursed.
+2. Request:          10 simultaneous parallel threads firing POST /api/loans/LN-CONC-DIFF-9F959F/disburse with 10 DIFFERENT references ('TX-DIFF-1' through 'TX-DIFF-10').
 3. Response:         Exactly 1 request succeeded with HTTP 200 OK. Remaining 9 requests immediately failed with HTTP 409 Conflict ('Single-disbursement invariant prohibits multiple disbursements').
 4. Fineract State:   Exactly 1 disbursement transaction recorded. State: ACTIVE. Total outstanding: 5,000,000 RWF.
 5. ERP State:        Exactly 1 journal entry posted in ERP.
@@ -32,7 +32,7 @@ SCENARIO: SIM-I2.B: 10 Parallel Disbursements (DIFFERENT References)
 ===========================================================================
 SCENARIO: SIM-I3: Concurrent Repayments (Different References)
 ===========================================================================
-1. Initial State:    Loan 'LN-CONC-REPAY-5B08EF' active with 5,000,000 RWF outstanding.
+1. Initial State:    Loan 'LN-CONC-REPAY-9F959F' active with 5,000,000 RWF outstanding.
 2. Request:          4 simultaneous repayment requests of 500,000 RWF each fired with unique external references ('TX-REP-1' through 'TX-REP-4').
 3. Response:         All 4 requests succeed with HTTP 200 OK, returning exact Fineract principal/interest breakdowns and decremented balances.
 4. Fineract State:   All 4 repayments posted. Final outstanding balance equals initial balance minus sum of principal portions (5,000,000 - 1,750,000 = 3,250,000 RWF).
