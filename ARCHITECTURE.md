@@ -161,6 +161,23 @@ stateDiagram-v2
 6. **`FAILED`**: Explicit business failure or unrecoverable validation error.
 7. **`NEEDS_RECONCILIATION`**: Inconsistency detected requiring manual or automated reconciliation sweep (e.g., Fineract succeeded but ERP remains down after max retries).
 
+### 4.2 Retry Policy, Allowed Transitions & Recovery Rules
+* **Allowed Transitions:**
+  * `RECEIVED` $\to$ `FINERACT_PENDING` | `FAILED`
+  * `FINERACT_PENDING` $\to$ `FINERACT_DONE` | `ERP_PENDING` | `FAILED`
+  * `FINERACT_DONE` $\to$ `ERP_PENDING` | `COMPLETED`
+  * `ERP_PENDING` $\to$ `COMPLETED` | `NEEDS_RECONCILIATION`
+  * `NEEDS_RECONCILIATION` $\to$ `COMPLETED` | `FAILED`
+* **What is Safe to Retry:**
+  * **Mutation to Fineract:** Never blindly retried! When a timeout occurs on a Fineract mutation, the service queries `find_transaction_by_external_id`. Only if confirmed missing is the transaction marked `FAILED`, allowing the caller to safely retry.
+  * **Posting to Mock ERP:** Safe to retry indefinitely. Because Mock ERP enforces uniqueness on `external_reference`, replaying the journal entry is completely idempotent and will never create duplicate ledger entries.
+* **Retry Policy:**
+  * Exponential backoff ($1\text{s}, 2\text{s}, 4\text{s}$) with jitter. Max automated attempts = 3.
+  * If max retries are exhausted while ERP remains unreachable, the transaction is marked `NEEDS_RECONCILIATION` and surfaces in the reconciliation report.
+* **Worker-less Crash Recovery:**
+  * State transitions and Fineract transaction IDs are committed to PostgreSQL *before* initiating the HTTP call to ERP.
+  * On application startup or via `POST /api/transactions/recover`, the recovery sweeper scans all transactions in `ERP_PENDING` / `NEEDS_RECONCILIATION` and posts them to Mock ERP idempotently, completing interrupted operations without requiring an external queue or background worker.
+
 ---
 
 ## 5. GL Synchronization Design (Part A)

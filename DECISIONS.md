@@ -65,6 +65,25 @@ This document records the architectural rationale, trade-offs, and failure recov
   * Reversals are executed as compensating entries (`DISBURSEMENT_REVERSAL`, `REPAYMENT_REVERSAL`) that post exact inverse debit and credit entries.
   * Both the erroneous transaction and its reversal remain permanently visible in the audit trail.
 
+### 1.10 Concurrency Defense-in-Depth: Why One Layer Alone Is Not Enough (Part I2)
+* **Assessment Requirement:** *Explain where the final financial invariant is enforced. Distinguish the layers you rely on (API idempotency, integration-DB constraint, locking, Fineract externalId, Fineract loan state), say why one layer alone is not enough, and name the last line of defence.*
+* **The Four Defense Layers:**
+  1. **Layer 1: API / Idempotency Table (`idempotency_records`):**
+     * Scoped by `(operation_type, idempotency_key)`.
+     * Filters out sequential duplicates and in-flight requests with identical references.
+     * *Why it is not enough on its own:* If 10 concurrent requests arrive with **different** references for the same loan, Layer 1 sees 10 distinct idempotency keys and admits all 10 into execution!
+  2. **Layer 2: Relational DB Unique Constraint (`disbursement_records`):**
+     * Primary key on `disbursement_records(loan_reference)`.
+     * When 10 concurrent requests with different references attempt disbursement at the exact same millisecond, the database engine enforces atomicity: exactly one thread successfully inserts; the remaining 9 encounter `IntegrityError` (PK violation), roll back, and fail with `409 Conflict`.
+     * *Why it is not enough on its own:* A split-brain scenario, application bypass, or direct API integration to Fineract could theoretically send a mutation without touching the integration service database.
+  3. **Layer 3: Fineract `externalId` Deduplication:**
+     * Fineract enforces uniqueness on transaction `externalId`.
+     * *Why it is not enough on its own:* Different references produce different `externalId` values in Fineract.
+  4. **Layer 4: Core Banking Loan State Machine (The Last Line of Defence):**
+     * In Apache Fineract core, a loan exists in status `APPROVED (200)`. Upon successful disbursement, Fineract executes an atomic database transaction changing the status to `ACTIVE (300)` and recording the disbursement transaction.
+     * Any subsequent call to `/loans/{loanId}?command=disburse` encounters Fineract's domain state check: `if (!loan.isApproved()) throw LoanCannotBeDisbursedException(...)`.
+     * **Conclusion:** The Fineract core loan state machine is the **last line of defence** guaranteeing that no financial loan product can ever be disbursed more than once under any race condition, network anomaly, or architectural failure.
+
 ---
 
 ## 2. Production Incident Investigation Walkthrough
