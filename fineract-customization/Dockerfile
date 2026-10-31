@@ -17,7 +17,7 @@ RUN if [ -f /fineract/patch/fineract-gl-sync.patch ]; then \
     fi
 
 # Build Fineract Boot JAR without running external integration tests during image build
-RUN ./gradlew bootJar -x test -x doclint -x spotlessCheck -x rat -x licenseMain -x licenseTest --no-daemon
+RUN ./gradlew bootJar -x test --no-daemon
 
 # Runtime Stage
 FROM eclipse-temurin:17-jre-jammy AS runtime
