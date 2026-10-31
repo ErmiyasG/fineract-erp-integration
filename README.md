@@ -1,4 +1,4 @@
-# Fintech Engineer Take-Home Assessment: Reliable Financial Integration
+# Apache Fineract (Java/Spring Boot) + Python ERP & Integration Service
 
 > **Apache Fineract (Java/Spring Boot) + Python ERP & Integration Service**  
 > Demonstrating financial correctness, idempotency, failure recovery, and concurrency control.
